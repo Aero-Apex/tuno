@@ -70,3 +70,12 @@ Local development needs Python with `pip install "yt-dlp[default]"`, plus ffmpeg
 ## Stack
 
 Node 22 · Fastify · SQLite (better-sqlite3) · yt-dlp + ffmpeg · youtubei.js (YT Music search) · React 19 · Vite · Tailwind · Zustand · TanStack Query · Docker.
+
+## Android app
+
+A native Android app (Kotlin, Jetpack Compose, Media3) lives in [`android/`](android). It logs in to your Tuno server,
+browses your library, searches, downloads links, and plays music in the background with lock-screen controls.
+Songs you play are kept on the phone (up to 250 MB), so replays use no data and put no load on the server.
+
+Download the signed APK from the [Releases](../../releases) page and install it (allow "install unknown apps").
+To build it yourself, see [`android/README.md`](android/README.md).

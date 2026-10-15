@@ -5,3 +5,4 @@ library/
 *.log
 .env
 .claude/
+*.apk

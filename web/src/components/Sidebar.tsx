@@ -10,7 +10,8 @@ import { Cover } from './Cover';
 import { Logo } from './Logo';
 
 export function useActiveJobs() {
-  const { data } = useQuery({ queryKey: ['jobs'], queryFn: api.jobs, refetchInterval: 15_000 });
+  // No polling: the live event stream (lib/events.ts) keeps this up to date.
+  const { data } = useQuery({ queryKey: ['jobs'], queryFn: api.jobs, staleTime: 60_000 });
   return data?.jobs.filter((j) => j.status === 'running' || j.status === 'queued').length ?? 0;
 }
 

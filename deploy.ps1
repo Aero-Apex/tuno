@@ -16,7 +16,7 @@ Write-Host '==> Packing source' -ForegroundColor Cyan
 if (Test-Path $archive) { Remove-Item $archive -Force }
 tar -czf $archive -C $root `
   --exclude=node_modules --exclude=dist --exclude=data --exclude=library `
-  --exclude=server/.env --exclude=.claude --exclude=*.log `
+  --exclude=server/.env --exclude=.claude --exclude=android --exclude=*.apk --exclude=.git --exclude=*.log `
   package.json package-lock.json Dockerfile docker-compose.yml .dockerignore server web
 if ($LASTEXITCODE -ne 0) { throw 'tar failed' }
 

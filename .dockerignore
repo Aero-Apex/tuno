@@ -6,3 +6,5 @@ server/.env
 *.log
 .claude
 .git
+android
+*.apk

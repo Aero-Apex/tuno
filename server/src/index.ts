@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import fastifyCompress from '@fastify/compress';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { config } from './config.js';
@@ -29,6 +30,20 @@ app.setErrorHandler((err: Error & { statusCode?: number; validation?: unknown },
   const status = err.statusCode ?? 500;
   if (status >= 500) app.log.error(err);
   reply.code(status).send({ error: status >= 500 && !(err instanceof HttpError) ? 'Something went wrong on the server' : err.message });
+});
+
+// Library lists are re-requested after every change event. With an ETag the browser/app gets a tiny "304 not
+// modified" when nothing changed instead of the whole list again. Registered before compression so it sees plain JSON.
+const ETAG_ROUTES = /^\/api\/(tracks|home|albums|artists|playlists|storage)(\/\d+)?(\?|$)/;
+app.addHook('onSend', async (req, reply, payload) => {
+  if (req.method !== 'GET' || reply.statusCode !== 200 || typeof payload !== 'string' || !ETAG_ROUTES.test(req.url)) return payload;
+  const etag = `W/"${crypto.createHash('sha1').update(payload).digest('base64url')}"`;
+  reply.header('etag', etag).header('cache-control', 'private, no-cache');
+  if (req.headers['if-none-match'] === etag) {
+    reply.code(304);
+    return '';
+  }
+  return payload;
 });
 
 // gzip/brotli for JSON, JS and CSS. Audio isn't compressible so it's sent as-is,

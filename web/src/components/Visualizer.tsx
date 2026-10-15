@@ -51,8 +51,17 @@ export function Visualizer({ className = '', bars = 12 }: { className?: string; 
     const readColor = () => (color = getComputedStyle(document.documentElement).getPropertyValue('--c-accent').trim().split(' ').join(','));
     readColor();
     const colorTimer = setInterval(readColor, 500);
-    const draw = () => {
+    let last = 0;
+    const draw = (now = 0) => {
+      // Nothing to animate while paused: stop the loop completely (it restarts on 'play').
+      if (audio.paused) {
+        raf = 0;
+        g.clearRect(0, 0, c.width, c.height);
+        return;
+      }
       raf = requestAnimationFrame(draw);
+      if (now - last < 33) return; // ~30 fps is plenty for a few bars
+      last = now;
       const dpr = window.devicePixelRatio || 1;
       const w = c.clientWidth * dpr;
       const h = c.clientHeight * dpr;
@@ -73,8 +82,13 @@ export function Visualizer({ className = '', bars = 12 }: { className?: string; 
         g.fill();
       }
     };
-    draw();
+    const start = () => {
+      if (!raf) raf = requestAnimationFrame(draw);
+    };
+    audio.addEventListener('play', start);
+    start();
     return () => {
+      audio.removeEventListener('play', start);
       cancelAnimationFrame(raf);
       clearInterval(colorTimer);
     };
