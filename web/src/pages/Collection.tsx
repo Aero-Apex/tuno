@@ -1,0 +1,53 @@
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { ActionBar, GradientHeader } from '../components/Page';
+import { TrackList } from '../components/TrackList';
+import { api } from '../lib/api';
+import { useCoverColor } from '../lib/color';
+import { fmtLong, plural } from '../lib/format';
+import { FilterInput, PlayAllBar } from './Library';
+
+function CollectionPage({ kind }: { kind: 'album' | 'artist' }) {
+  const name = decodeURIComponent(useParams().name ?? '');
+  const { data: tracks = [] } = useQuery({
+    queryKey: ['tracks', kind, name],
+    queryFn: () => api.tracks(kind === 'album' ? { album: name, sort: 'title' } : { artist: name, sort: 'plays' }),
+  });
+  const [q, setQ] = useState('');
+  const cover = tracks.find((t) => t.cover)?.cover;
+  const tint = useCoverColor(cover);
+  const filtered = q ? tracks.filter((t) => `${t.title} ${t.album ?? ''}`.toLowerCase().includes(q.toLowerCase())) : tracks;
+  const ctx = `${kind}:${name}`;
+  const artists = [...new Set(tracks.map((t) => t.artist))];
+
+  return (
+    <div className="animate-fade-in pb-10">
+      <GradientHeader
+        cover={cover}
+        round={kind === 'artist'}
+        kicker={kind === 'album' ? 'Album' : 'Artist'}
+        title={name}
+        meta={
+          <>
+            {kind === 'album' && artists.length > 0 && <span className="font-semibold">{artists.slice(0, 3).join(', ')} ·</span>}
+            <span>{plural(tracks.length, 'song')}</span>
+            <span>· {fmtLong(tracks.reduce((a, t) => a + (t.duration ?? 0), 0))}</span>
+          </>
+        }
+      />
+      <ActionBar tint={tint}>
+        <PlayAllBar tracks={filtered} context={ctx} />
+        <div className="ml-auto hidden sm:block">
+          <FilterInput value={q} onChange={setQ} />
+        </div>
+      </ActionBar>
+      <div className="px-2 md:px-4">
+        <TrackList tracks={filtered} context={ctx} showAlbum={kind === 'artist'} showAdded={false} />
+      </div>
+    </div>
+  );
+}
+
+export const AlbumPage = () => <CollectionPage kind="album" />;
+export const ArtistPage = () => <CollectionPage kind="artist" />;

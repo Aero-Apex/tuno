@@ -1,0 +1,32 @@
+name: tuno
+
+services:
+  tuno:
+    build: .
+    image: tuno:latest
+    container_name: tuno
+    restart: unless-stopped
+    # Runs as uid 1000 so downloaded files on the host belong to your user.
+    user: "1000:1000"
+    # Reaps finished yt-dlp/ffmpeg child processes.
+    init: true
+    ports:
+      - "7070:7070"
+    environment:
+      - TZ=Etc/UTC
+      - TUNO_CONCURRENCY=3
+      # Keep Node's heap small; the rest of the memory is for yt-dlp and ffmpeg.
+      - NODE_OPTIONS=--max-old-space-size=256
+    # Tuno can never take more than this from the server, however much is queued.
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 256
+    # Docker's own log files grow forever by default.
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    volumes:
+      - ../data:/data
+      - ../library:/library

@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --c-accent: 30 215 96;
+  --c-on-accent: 0 0 0;
+  --c-bg: 18 18 18;
+  --c-surface: 0 0 0;
+  --c-elevated: 31 31 31;
+  --c-text: 255 255 255;
+  --c-muted: 167 167 167;
+  --c-dynamic: 30 215 96;
+  --font: 'Figtree';
+  --font-scale: 1;
+  --radius: 8px;
+  --cover-radius: 6px;
+  --row-h: 56px;
+  --gap-scale: 1;
+  --sidebar-w: 280px;
+  --anim: 200ms;
+  --panel-alpha: 1;
+  --player-h: 88px;
+  color-scheme: dark;
+}
+
+html {
+  font-size: calc(16px * var(--font-scale));
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: rgb(var(--c-surface));
+  color: rgb(var(--c-text));
+  font-family: var(--font), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overflow: hidden;
+}
+
+* {
+  transition-duration: var(--anim);
+}
+
+::selection {
+  background: rgb(var(--c-accent) / 0.35);
+}
+
+/* Thin, theme-colored scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--c-text) / 0.25) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgb(var(--c-text) / 0.2);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--c-text) / 0.35);
+  background-clip: content-box;
+}
+
+@layer components {
+  .panel {
+    background: rgb(var(--c-bg) / var(--panel-alpha));
+    border-radius: var(--radius);
+  }
+  [data-glass='true'] .panel {
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-accent {
+    @apply btn bg-accent text-on-accent hover:brightness-110 hover:scale-[1.03];
+  }
+  .btn-ghost {
+    @apply btn border border-text/20 text-text hover:border-text/60;
+  }
+  .btn-subtle {
+    @apply btn bg-text/10 text-text hover:bg-text/15;
+  }
+  .icon-btn {
+    @apply inline-flex items-center justify-center rounded-full p-2 text-muted transition-colors hover:text-text disabled:opacity-40;
+  }
+  .input {
+    @apply w-full rounded bg-text/10 px-3 py-2 text-sm text-text outline-none ring-0 placeholder:text-muted/80 focus:bg-text/15 focus:ring-2 focus:ring-text/30;
+  }
+  .chip {
+    @apply rounded-full bg-text/10 px-3 py-1.5 text-sm font-medium text-text transition-colors hover:bg-text/15;
+  }
+  .chip-active {
+    @apply rounded-full bg-text px-3 py-1.5 text-sm font-medium text-bg;
+  }
+  .card {
+    @apply rounded-md p-3 transition-colors hover:bg-text/[0.07];
+  }
+  .label {
+    @apply text-xs font-semibold uppercase tracking-wider text-muted;
+  }
+}
+
+/* Range sliders that pick up the accent color */
+input[type='range'].slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, rgb(var(--c-text)) var(--fill, 0%), rgb(var(--c-text) / 0.25) var(--fill, 0%));
+  cursor: pointer;
+}
+input[type='range'].slider:hover {
+  background: linear-gradient(to right, rgb(var(--c-accent)) var(--fill, 0%), rgb(var(--c-text) / 0.25) var(--fill, 0%));
+}
+input[type='range'].slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgb(var(--c-text));
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+input[type='range'].slider:hover::-webkit-slider-thumb,
+input[type='range'].slider:focus-visible::-webkit-slider-thumb {
+  opacity: 1;
+}
+input[type='range'].slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(var(--c-text));
+}
+
+.cover {
+  border-radius: var(--cover-radius);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
