@@ -194,6 +194,7 @@ export const api = {
   updatePlaylist: (id: number, patch: { name?: string; description?: string | null; cover?: string | null }) =>
     request<PlaylistSummary>('PATCH', `/api/playlists/${id}`, patch),
   deletePlaylist: (id: number, deleteTracks: boolean) => request('DELETE', `/api/playlists/${id}?deleteTracks=${deleteTracks ? 1 : 0}`),
+  deleteOtherSongs: (id: number) => request<DeleteResult & { trackIds: number[] }>('POST', `/api/playlists/${id}/delete-others`, {}),
   addToPlaylist: (id: number, trackIds: number[]) => request('POST', `/api/playlists/${id}/tracks`, { trackIds }),
   removeFromPlaylist: (id: number, trackId: number) => request('DELETE', `/api/playlists/${id}/tracks/${trackId}`),
   reorderPlaylist: (id: number, trackIds: number[]) => request('PUT', `/api/playlists/${id}/order`, { trackIds }),

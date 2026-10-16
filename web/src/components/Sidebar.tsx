@@ -8,6 +8,7 @@ import { usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
 import { Cover } from './Cover';
 import { Logo } from './Logo';
+import { usePlaylistMenu } from './PlaylistMenu';
 
 export function useActiveJobs() {
   // No polling: the live event stream (lib/events.ts) keeps this up to date.
@@ -53,6 +54,7 @@ export function Sidebar() {
   const context = usePlayer((s) => s.context);
   const playing = usePlayer((s) => s.playing);
   const { data: playlists = [] } = useQuery({ queryKey: ['playlists'], queryFn: api.playlists });
+  const playlistMenu = usePlaylistMenu();
 
   const newPlaylist = async () => {
     const p = await api.createPlaylist('New playlist');
@@ -115,6 +117,7 @@ export function Sidebar() {
             <NavLink
               key={p.id}
               to={`/playlist/${p.id}`}
+              onContextMenu={playlistMenu.onContextMenu(p)}
               className={({ isActive }) => `flex items-center gap-3 rounded p-2 transition-colors hover:bg-text/10 ${isActive ? 'bg-text/10' : ''}`}
             >
               <Cover src={p.cover} mosaic={p.covers} className="h-12 w-12 shrink-0" />
@@ -130,6 +133,7 @@ export function Sidebar() {
           ))}
         </div>
       </div>
+      {playlistMenu.element}
     </aside>
   );
 }

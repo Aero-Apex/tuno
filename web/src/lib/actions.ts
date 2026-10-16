@@ -62,7 +62,49 @@ export function useActions() {
       refresh('playlist', 'playlists');
     },
 
-    deleteTrack(t: Track) {
+    /** Deletes a playlist. Its songs stay in the library. */
+    deletePlaylist(p: { id: number; name: string }) {
+      useUI.getState().ask({
+        title: `Delete “${p.name}”?`,
+        body: 'The playlist is removed. Its songs stay in your library.',
+        confirmLabel: 'Delete playlist',
+        danger: true,
+        onConfirm: async () => {
+          try {
+            await api.deletePlaylist(p.id, false);
+          } catch (err) {
+            return toast((err as Error).message, 'error');
+          }
+          refresh('playlists', 'playlist', 'home');
+          if (window.location.pathname === `/playlist/${p.id}`) navigate('/library?tab=playlists');
+          toast('Playlist deleted', 'success');
+        },
+      });
+    },
+
+    /** Deletes every song in the library that isn't in this playlist, after one confirmation. */
+    deleteOtherSongs(p: { id: number; name: string; count: number }) {
+      if (!p.count) return toast('This playlist is empty. Add some songs first, so there is something to keep.', 'info');
+      useUI.getState().ask({
+        title: `Delete songs not in “${p.name}”?`,
+        body: 'Every other song in your library is deleted from the server, including songs in other playlists. This cannot be undone.',
+        confirmLabel: 'Delete songs',
+        danger: true,
+        onConfirm: async () => {
+          let r: Awaited<ReturnType<typeof api.deleteOtherSongs>>;
+          try {
+            r = await api.deleteOtherSongs(p.id);
+          } catch (err) {
+            return toast((err as Error).message, 'error');
+          }
+          usePlayer.getState().dropTracks(r.trackIds);
+          qc.invalidateQueries();
+          toast(r.deleted ? `Deleted ${plural(r.deleted, 'song')} · freed ${fmtBytes(r.freed)}` : 'No other songs to delete', 'success');
+        },
+      });
+    },
+
+    deleteTrack(t: Pick<Track, 'id' | 'title'>) {
       useUI.getState().ask({
         title: 'Delete from library?',
         body: `“${t.title}” will be removed from every playlist and its file deleted from the server.`,
@@ -71,7 +113,7 @@ export function useActions() {
         onConfirm: async () => {
           const r = await api.deleteTrack(t.id);
           usePlayer.getState().dropTracks([t.id]);
-          refresh('tracks', 'home', 'playlist', 'playlists', 'albums', 'artists', 'storage', 'system');
+          refresh('tracks', 'home', 'playlist', 'playlists', 'albums', 'artists', 'storage', 'system', 'jobs');
           toast(`Deleted · freed ${fmtBytes(r.freed)}`, 'success');
         },
       });
@@ -88,7 +130,7 @@ export function useActions() {
         onConfirm: async () => {
           const r = await api.deleteTracks(ids);
           usePlayer.getState().dropTracks(ids);
-          refresh('tracks', 'home', 'playlist', 'playlists', 'albums', 'artists', 'storage', 'system');
+          refresh('tracks', 'home', 'playlist', 'playlists', 'albums', 'artists', 'storage', 'system', 'jobs');
           toast(`Deleted ${plural(r.deleted, 'song')} · freed ${fmtBytes(r.freed)}`, 'success');
           onDone?.();
         },

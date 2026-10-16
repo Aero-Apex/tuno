@@ -130,9 +130,10 @@ interface CardProps {
   round?: boolean;
   badge?: ReactNode;
   className?: string;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }
 
-export function Card({ cover, mosaic, title, subtitle, to, onClick, onPlay, playing, round, badge, className = '' }: CardProps) {
+export function Card({ cover, mosaic, title, subtitle, to, onClick, onPlay, playing, round, badge, className = '', onContextMenu }: CardProps) {
   const body = (
     <>
       <div className="relative mb-3">
@@ -155,12 +156,12 @@ export function Card({ cover, mosaic, title, subtitle, to, onClick, onPlay, play
   );
   const cls = `group card block w-full text-left ${className}`;
   return to ? (
-    <Link to={to} className={cls}>
+    <Link to={to} className={cls} onContextMenu={onContextMenu}>
       {body}
     </Link>
   ) : (
     // A div, not a <button>, because the card contains its own play button.
-    <div role="button" tabIndex={0} onClick={onClick} onKeyDown={(e) => {
+    <div role="button" tabIndex={0} onClick={onClick} onContextMenu={onContextMenu} onKeyDown={(e) => {
         if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
         e.preventDefault(); // Space would otherwise scroll the page
         onClick?.();

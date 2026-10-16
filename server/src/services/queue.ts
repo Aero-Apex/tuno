@@ -5,7 +5,8 @@ import { addDownloadedTrack, addToPlaylist, createPlaylist, findTrack, reuseFrom
 import { HttpError } from '../http.js';
 import { assertHasRoom } from '../auth.js';
 import { cleanMeta } from './metadata.js';
-import { matchSong } from './search.js';
+import { matchSong, matchWords } from './search.js';
+import { geniusSongWords, isGeniusUrl, titleCase } from './genius.js';
 import { isSpotifyUrl, resolveSpotify } from './spotify.js';
 import { getSoundCloudTrack } from './soundcloud.js';
 import { bestThumb, downloadAudio, probe } from './ytdlp.js';
@@ -129,7 +130,8 @@ export async function importUrl(userId: number, url: string, opts: { playlistId?
         title: t.title,
         artist: t.artist,
         album: t.album ?? (col.kind === 'album' ? col.name : null),
-        thumbnail: col.cover ?? null,
+        // Each song gets its own artwork; a playlist's cover would make every row look the same. Albums share their cover.
+        thumbnail: t.cover ?? (col.kind === 'album' || col.kind === 'track' ? col.cover ?? null : null),
         duration_hint: t.durationSec ?? null,
         playlist_id: playlistId,
         position: i + 1,
@@ -138,6 +140,15 @@ export async function importUrl(userId: number, url: string, opts: { playlistId?
       .filter((j) => !existingQueries.has(j.query.toLowerCase()));
     enqueue(userId, jobs);
     return { kind: col.kind === 'track' ? 'track' : 'playlist', name: col.name, playlistId, queued: jobs.length, existing: col.tracks.length - jobs.length };
+  }
+
+  // Genius blocks every non-browser request (403), so find the song from the words in its link instead.
+  if (isGeniusUrl(url)) {
+    const words = geniusSongWords(url);
+    if (!words) throw new Error("Genius pages can't be downloaded. Paste the song's YouTube, SoundCloud or Spotify link, or search for it.");
+    const name = titleCase(words);
+    enqueue(userId, [{ query: words.join(' '), title: name, source: 'genius', playlist_id: opts.playlistId ?? null }]);
+    return { kind: 'track', name, playlistId: opts.playlistId ?? null, queued: 1, existing: 0 };
   }
 
   // A song link copied from inside a playlist or Mix (watch?v=X&list=Y) means just that song;
@@ -276,7 +287,13 @@ async function downloadSameSongElsewhere(
   const match = await matchSong(title, artist ?? '', duration, { skipSoundCloud: true });
   if (!match) throw new Error('This upload is DRM-protected and no copy was found on YouTube Music or YouTube');
   // Keep the original's title/artist for the library entry (query marks it as metadata-first).
-  updateJob(jobId, { url: match.url, source: match.source, source_id: match.id, query: `${artist} - ${title}` });
+  updateJob(jobId, {
+    url: match.url,
+    source: match.source,
+    source_id: match.id,
+    query: `${artist} - ${title}`,
+    ...(job.thumbnail || !match.thumbnail ? {} : { thumbnail: match.thumbnail }),
+  });
   const owned = findTrack(job.user_id!, match.source, match.id);
   if (owned) return owned.id;
   return downloadWithRetry(jobId, match.url, signal);
@@ -292,12 +309,13 @@ async function runJob(job: JobRow) {
     let sourceId = job.source_id;
 
     if (!url && job.query) {
-      const match = await matchSong(job.title ?? job.query, job.artist ?? '', job.duration_hint);
+      const match =
+        job.source === 'genius' ? await matchWords(job.query.split(/\s+/)) : await matchSong(job.title ?? job.query, job.artist ?? '', job.duration_hint);
       if (!match) throw new Error('No close match on YouTube Music, YouTube or SoundCloud');
       url = match.url;
       source = match.source;
       sourceId = match.id;
-      updateJob(job.id, { url, source, source_id: sourceId });
+      updateJob(job.id, { url, source, source_id: sourceId, ...(job.thumbnail || !match.thumbnail ? {} : { thumbnail: match.thumbnail }) });
     }
     if (!url) throw new Error('Nothing to download');
     throwIfCanceled(ctrl.signal);
@@ -373,13 +391,19 @@ function pump() {
 }
 
 export function startQueue() {
+  // Older jobs were given their playlist's cover; drop it so each song shows its own artwork.
+  db.prepare(
+    `UPDATE jobs SET thumbnail = NULL WHERE query IS NOT NULL AND playlist_id IS NOT NULL
+     AND thumbnail IS NOT NULL AND thumbnail = (SELECT cover_url FROM playlists WHERE id = jobs.playlist_id)`,
+  ).run();
   pump();
 }
 
 export function listJobs(userId: number, limit = 500) {
+  // A finished download whose song was deleted keeps its row (so a playlist sync doesn't fetch the song again) but isn't listed.
   const rows = db
     .prepare(
-      `SELECT * FROM jobs WHERE user_id = ?
+      `SELECT * FROM jobs WHERE user_id = ? AND NOT (status = 'done' AND track_id IS NULL)
        ORDER BY CASE status WHEN 'running' THEN 0 WHEN 'queued' THEN 1 WHEN 'error' THEN 2 ELSE 3 END, id DESC LIMIT ?`,
     )
     .all(userId, limit) as JobRow[];

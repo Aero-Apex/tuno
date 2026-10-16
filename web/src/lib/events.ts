@@ -44,7 +44,7 @@ export function useServerEvents() {
         // Playlist imports show failures on the Downloads page instead of a toast per song.
         if (job.status === 'error' && !job.playlistId) useUI.getState().toast(`Couldn't download “${job.title ?? job.url}”: ${job.error}`, 'error');
       } else if (ev.type === 'jobs-cleared') invalidate('jobs');
-      else if (ev.type === 'library') invalidate('tracks', 'home', 'albums', 'artists', 'playlist', 'search', 'playlists', 'storage', 'me');
+      else if (ev.type === 'library') invalidate('tracks', 'home', 'albums', 'artists', 'playlist', 'search', 'playlists', 'storage', 'me', 'jobs');
       else if (ev.type === 'playlists') invalidate('playlists', 'playlist');
     };
 

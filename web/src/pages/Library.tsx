@@ -3,6 +3,7 @@ import { Heart, Library, Link2, Plus, Search, Shuffle } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ActionBar, Card, Empty, GradientHeader, Page, PlayButton, grid } from '../components/Page';
+import { usePlaylistMenu } from '../components/PlaylistMenu';
 import { TrackList } from '../components/TrackList';
 import { api, type Track } from '../lib/api';
 import { fmtLong, plural } from '../lib/format';
@@ -82,6 +83,7 @@ export function LibraryPage() {
   const [q, setQ] = useState('');
   const navigate = useNavigate();
   const openImport = useUI((s) => s.openImport);
+  const playlistMenu = usePlaylistMenu();
 
   const tracks = useQuery({ queryKey: ['tracks', sort], queryFn: () => api.tracks({ sort }), enabled: tab === 'songs' });
   const playlists = useQuery({ queryKey: ['playlists'], queryFn: api.playlists, enabled: tab === 'playlists' });
@@ -169,6 +171,7 @@ export function LibraryPage() {
             <Card
               key={p.id}
               to={`/playlist/${p.id}`}
+              onContextMenu={playlistMenu.onContextMenu(p)}
               cover={p.cover}
               mosaic={p.covers}
               title={p.name}
@@ -199,6 +202,7 @@ export function LibraryPage() {
           ))}
         </div>
       )}
+      {playlistMenu.element}
     </Page>
   );
 }

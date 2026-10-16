@@ -113,7 +113,7 @@ function recordFailure(ip: string) {
   if (attempts.size > 10_000) attempts.clear();
 }
 
-/** Routes anyone may call without logging in. Everything else under /api needs a session. */
+/** Routes anyone may call without logging in (plus /api/app/*, the app update feed). Everything else under /api needs a session. */
 const PUBLIC = new Set(['/api/health', '/api/auth/login', '/api/auth/me', '/api/auth/logout']);
 
 export function requireAdmin(req: FastifyRequest): User {
@@ -132,7 +132,7 @@ export async function authPlugin(app: FastifyInstance) {
     if (!req.url.startsWith('/api/')) return;
     req.user = userFromRequest(req);
     const path = req.url.split('?')[0];
-    if (!req.user && !PUBLIC.has(path)) {
+    if (!req.user && !PUBLIC.has(path) && !path.startsWith('/api/app/')) {
       reply.code(401).send({ error: 'Please log in' });
       return reply;
     }

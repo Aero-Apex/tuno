@@ -1,6 +1,6 @@
 import { Music2 } from 'lucide-react';
 import { useState } from 'react';
-import { img } from '../lib/img';
+import { img, sizeFromClass } from '../lib/img';
 
 interface Props {
   src?: string | null;
@@ -14,7 +14,8 @@ interface Props {
 export function Cover({ src, mosaic, className = '', alt = '', round }: Props) {
   const [failed, setFailed] = useState(false);
   const shape = round ? 'rounded-full' : 'cover';
-  const url = img(src);
+  const px = sizeFromClass(className);
+  const url = img(src, px);
 
   if (url && !failed) {
     return (
@@ -22,6 +23,7 @@ export function Cover({ src, mosaic, className = '', alt = '', round }: Props) {
         src={url}
         alt={alt}
         loading="lazy"
+        decoding="async"
         draggable={false}
         onError={() => setFailed(true)}
         className={`${shape} aspect-square bg-elevated object-cover shadow-md ${className}`}
@@ -32,7 +34,7 @@ export function Cover({ src, mosaic, className = '', alt = '', round }: Props) {
     return (
       <div className={`${shape} grid aspect-square grid-cols-2 overflow-hidden bg-elevated shadow-md ${className}`}>
         {mosaic.slice(0, 4).map((m) => (
-          <img key={m} src={m} alt="" loading="lazy" draggable={false} className="h-full w-full object-cover" />
+          <img key={m} src={img(m, px ? px / 2 : 96) ?? m} alt="" loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover" />
         ))}
       </div>
     );

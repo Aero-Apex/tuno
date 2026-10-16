@@ -118,7 +118,11 @@ export async function probe(url: string, opts: { noPlaylist?: boolean } = {}): P
   const res = await runYtdlp(['-J', '--flat-playlist', '--no-warnings', ...(opts.noPlaylist ? ['--no-playlist'] : []), url], {
     timeoutMs: 120_000,
   });
-  if (res.code !== 0) throw new Error(ytdlpError(res.stderr));
+  if (res.code !== 0) {
+    const msg = ytdlpError(res.stderr);
+    if (/HTTP Error 403/i.test(msg)) throw new Error("That site refuses automated downloads (HTTP 403). Try the song's YouTube, SoundCloud or Spotify link instead.");
+    throw new Error(msg);
+  }
   return JSON.parse(res.stdout) as ProbeResult;
 }
 

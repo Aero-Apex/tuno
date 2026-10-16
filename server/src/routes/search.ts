@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { search, type SearchSource } from '../services/search.js';
 import { resolveStream, type StreamInfo } from '../services/ytdlp.js';
 import { currentUser } from '../auth.js';
+import { isPublicUrl, thumbWidth, thumbnailBuffer } from '../services/thumbs.js';
 
 const SOURCES: SearchSource[] = ['youtube', 'ytmusic', 'soundcloud', 'library'];
 
@@ -24,7 +25,33 @@ function getStream(url: string, fresh = false): Promise<StreamInfo> {
   return info;
 }
 
+/** Remote artwork, kept in memory. Bounded by bytes (not just count) so a few big images can't eat the container's memory. */
+const IMG_CACHE_BYTES = 24 * 1024 * 1024;
 const imgCache = new Map<string, { type: string; body: Buffer }>();
+let imgBytes = 0;
+function rememberImg(key: string, entry: { type: string; body: Buffer }) {
+  if (entry.body.length > 2_000_000 || imgCache.has(key)) return;
+  imgCache.set(key, entry);
+  imgBytes += entry.body.length;
+  while (imgBytes > IMG_CACHE_BYTES) {
+    const oldest = imgCache.keys().next().value!;
+    imgBytes -= imgCache.get(oldest)!.body.length;
+    imgCache.delete(oldest);
+  }
+}
+
+/** Fetches a public image, following a few redirects but never into the private network. */
+async function fetchImage(url: string): Promise<Response | null> {
+  for (let hop = 0; hop < 4; hop++) {
+    if (!(await isPublicUrl(url))) return null;
+    const res = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0' }, redirect: 'manual', signal: AbortSignal.timeout(10_000) }).catch(() => null);
+    if (!res) return null;
+    const next = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+    if (!next) return res;
+    url = new URL(next, url).href;
+  }
+  return null;
+}
 
 const MIME: Record<string, string> = { m4a: 'audio/mp4', mp4: 'audio/mp4', webm: 'audio/webm', mp3: 'audio/mpeg', opus: 'audio/ogg', ogg: 'audio/ogg' };
 
@@ -42,23 +69,24 @@ export default async function searchRoutes(app: FastifyInstance) {
 
   /** Proxies remote artwork so the browser can read its colors (canvas needs same-origin images). */
   app.get('/api/img', async (req, reply) => {
-    const { url } = req.query as { url?: string };
+    const { url, w } = req.query as { url?: string; w?: string };
     if (!url || !/^https?:\/\//.test(url)) return reply.code(400).send({ error: 'Missing url' });
-    const hit = imgCache.get(url);
-    if (hit) {
-      reply.header('content-type', hit.type).header('cache-control', 'public, max-age=86400');
-      return reply.send(hit.body);
-    }
-    const res = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0' } }).catch(() => null);
+    const width = thumbWidth(w); // ?w=128|256|512 returns a small copy (list rows don't need the 1 MB original)
+    const key = width ? `${url}|${width}` : url;
+    reply.header('cache-control', 'public, max-age=86400');
+    const hit = imgCache.get(key);
+    if (hit) return reply.header('content-type', hit.type).send(hit.body);
+
+    const res = await fetchImage(url);
     const type = res?.headers.get('content-type') ?? '';
-    if (!res?.ok || !type.startsWith('image/')) return reply.code(502).send({ error: 'Image unavailable' });
-    const body = Buffer.from(await res.arrayBuffer());
-    if (body.length < 2_000_000) {
-      imgCache.set(url, { type, body });
-      if (imgCache.size > 400) imgCache.delete(imgCache.keys().next().value!);
+    if (!res?.ok || !type.startsWith('image/') || Number(res.headers.get('content-length') ?? 0) > 10_000_000) return reply.code(502).send({ error: 'Image unavailable' });
+    let entry: { type: string; body: Buffer } = { type, body: Buffer.from(await res.arrayBuffer()) };
+    if (width) {
+      const small = await thumbnailBuffer(entry.body, width);
+      if (small) entry = { type: 'image/jpeg', body: small };
     }
-    reply.header('content-type', type).header('cache-control', 'public, max-age=86400');
-    return reply.send(body);
+    rememberImg(key, entry);
+    return reply.header('content-type', entry.type).send(entry.body);
   });
 
   /** Starts looking up a stream URL early (on hover / for the next queued song) so playback starts instantly. */

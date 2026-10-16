@@ -9,6 +9,7 @@ import { cancelAll } from '../services/queue.js';
 import { badRequest, idList, notFound } from '../http.js';
 import { currentUser } from '../auth.js';
 import { diskInfo } from '../services/limits.js';
+import { thumbWidth, thumbnail } from '../services/thumbs.js';
 
 const SORTS: Record<string, string> = {
   added: 'added_at DESC',
@@ -191,6 +192,10 @@ export default async function libraryRoutes(app: FastifyInstance) {
     const abs = path.resolve(config.libraryDir, t.cover_path);
     // private: covers belong to one account, so shared caches (Cloudflare) must not keep them.
     reply.header('cache-control', 'private, max-age=604800');
+    // ?w=128|256|512 sends a small copy instead of the full-size cover.
+    const width = thumbWidth((req.query as { w?: string }).w);
+    const small = width ? await thumbnail(abs, width) : null;
+    if (small) return reply.sendFile(path.basename(small), path.dirname(small));
     return reply.sendFile(path.basename(abs), path.dirname(abs));
   });
 
@@ -202,6 +207,9 @@ export default async function libraryRoutes(app: FastifyInstance) {
     const table = m?.[1] === 'track' ? 'tracks' : 'playlists';
     if (!m || !db.prepare(`SELECT 1 FROM ${table} WHERE id = ? AND user_id = ?`).get(Number(m[2]), user.id)) throw notFound('Not found');
     reply.header('cache-control', 'private, max-age=604800');
+    const width = thumbWidth((req.query as { w?: string }).w);
+    const small = width ? await thumbnail(path.join(config.dataDir, 'covers', file), width) : null;
+    if (small) return reply.sendFile(path.basename(small), path.dirname(small));
     return reply.sendFile(file, path.join(config.dataDir, 'covers'));
   });
 }

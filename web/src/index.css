@@ -48,6 +48,16 @@ body {
   transition-duration: var(--anim);
 }
 
+/* A translucent select background makes the browser paint its popup list white under light text; give options a solid themed one. */
+select {
+  cursor: pointer;
+}
+select option,
+select optgroup {
+  background-color: rgb(var(--c-elevated));
+  color: rgb(var(--c-text));
+}
+
 ::selection {
   background: rgb(var(--c-accent) / 0.35);
 }

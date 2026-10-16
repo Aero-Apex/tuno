@@ -27,9 +27,35 @@ data class Track(
     val duration: Double?,
     val cover: String?,
     val liked: Boolean,
-)
+    val sourceUrl: String? = null,
+    val addedAt: Long = 0,
+    val playCount: Int = 0,
+    val lastPlayedAt: Long = 0,
+) {
+    /** Every artist credited on the song, worked out once. */
+    val artists: List<String> by lazy(LazyThreadSafetyMode.NONE) { splitArtists(artist) }
 
-data class Playlist(val id: Long, val name: String, val count: Int, val cover: String?, val pending: Int)
+    /** "Daft Punk, Pharrell Williams" -> "Daft Punk": the artist a song is filed under. */
+    val mainArtist: String get() = artists.firstOrNull() ?: artist
+}
+
+private val ARTIST_SEPARATORS = Regex("""\s*(?:,|&|\bfeat\.?(?=\s)|\bft\.?(?=\s))\s*""", RegexOption.IGNORE_CASE)
+
+/** Every artist credited on a song ("A, B & C feat. D" -> A, B, C, D). */
+fun splitArtists(s: String): List<String> = s.split(ARTIST_SEPARATORS).map { it.trim() }.filter { it.isNotEmpty() }
+
+data class Playlist(
+    val id: Long,
+    val name: String,
+    val count: Int,
+    val cover: String?,
+    val pending: Int,
+    val covers: List<String> = emptyList(),
+    val duration: Double = 0.0,
+    val description: String? = null,
+    val sourceUrl: String? = null,
+    val updatedAt: Long = 0,
+)
 
 data class Job(
     val id: Long,
@@ -39,7 +65,12 @@ data class Job(
     val url: String?,
     val progress: Double,
     val error: String?,
-)
+    val source: String? = null,
+    val thumbnail: String? = null,
+    val trackId: Long? = null,
+) {
+    val active: Boolean get() = status == "running" || status == "queued"
+}
 
 data class SearchResult(
     val key: String,
@@ -57,22 +88,43 @@ data class Colors(val accent: String, val bg: String, val surface: String, val e
 
 class ApiException(val code: Int, message: String) : Exception(message)
 
-private fun JSONObject.str(key: String): String? = if (isNull(key) || !has(key)) null else getString(key)
-private fun JSONObject.dbl(key: String): Double? = if (isNull(key) || !has(key)) null else getDouble(key)
+private fun JSONObject.str(key: String): String? = if (!has(key) || isNull(key)) null else getString(key)
+private fun JSONObject.dbl(key: String): Double? = if (!has(key) || isNull(key)) null else getDouble(key)
+private fun JSONObject.lng(key: String): Long? = if (!has(key) || isNull(key)) null else getLong(key)
 
 private fun parseTrack(o: JSONObject) = Track(
     id = o.getLong("id"),
     title = o.optString("title"),
     artist = o.optString("artist"),
-    album = o.str("album"),
+    album = o.str("album")?.ifBlank { null },
     duration = o.dbl("duration"),
     cover = o.str("cover"),
     liked = o.optBoolean("liked"),
+    sourceUrl = o.str("sourceUrl"),
+    addedAt = o.lng("addedAt") ?: 0,
+    playCount = o.optInt("playCount"),
+    lastPlayedAt = o.lng("lastPlayedAt") ?: 0,
 )
+
+private fun parsePlaylist(o: JSONObject): Playlist {
+    val covers = o.optJSONArray("covers")
+    return Playlist(
+        id = o.getLong("id"),
+        name = o.optString("name"),
+        count = o.optInt("count"),
+        cover = o.str("cover"),
+        pending = o.optInt("pending"),
+        covers = if (covers == null) emptyList() else List(covers.length()) { covers.getString(it) },
+        duration = o.optDouble("duration", 0.0),
+        description = o.str("description"),
+        sourceUrl = o.str("sourceUrl"),
+        updatedAt = o.lng("updatedAt") ?: 0,
+    )
+}
 
 private fun <T> JSONArray.map(f: (JSONObject) -> T): List<T> = List(length()) { f(getJSONObject(it)) }
 
-/** Saved settings: which server to talk to and the login session. */
+/** Saved settings: which server to talk to, the login session and a few view preferences. */
 class Prefs(ctx: Context) {
     private val sp = ctx.getSharedPreferences("tuno", Context.MODE_PRIVATE)
     var server: String
@@ -81,6 +133,21 @@ class Prefs(ctx: Context) {
     var session: String?
         get() = sp.getString("session", null)
         set(v) = sp.edit().putString("session", v).apply()
+    var recentSearches: List<String>
+        get() = sp.getString("recentSearches", "")!!.split('\n').filter { it.isNotBlank() }
+        set(v) = sp.edit().putString("recentSearches", v.joinToString("\n")).apply()
+    var libraryGrid: Boolean
+        get() = sp.getBoolean("libraryGrid", false)
+        set(v) = sp.edit().putBoolean("libraryGrid", v).apply()
+    var librarySort: Int
+        get() = sp.getInt("librarySort", 0)
+        set(v) = sp.edit().putInt("librarySort", v).apply()
+    var autoUpdate: Boolean
+        get() = sp.getBoolean("autoUpdate", true)
+        set(v) = sp.edit().putBoolean("autoUpdate", v).apply()
+    var lastUpdateCheck: Long
+        get() = sp.getLong("lastUpdateCheck", 0L)
+        set(v) = sp.edit().putLong("lastUpdateCheck", v).apply()
 
     companion object {
         const val DEFAULT_SERVER = "https://tuno.eu.cc"
@@ -174,7 +241,7 @@ class Api(ctx: Context, private val prefs: Prefs) {
         client.cache?.evictAll()
     }
 
-    /** The colors chosen in the web app's Appearance settings, so both apps look the same. */
+    /** The colors chosen in the web app's Appearance settings, so both apps share an accent color. */
     suspend fun colors(): Colors? = runCatching {
         val c = JSONObject(call("GET", "/api/settings")).getJSONObject("theme").getJSONObject("colors")
         Colors(c.getString("accent"), c.getString("bg"), c.getString("surface"), c.getString("elevated"), c.getString("text"), c.getString("muted"))
@@ -182,11 +249,26 @@ class Api(ctx: Context, private val prefs: Prefs) {
 
     suspend fun tracks(): List<Track> = JSONArray(call("GET", "/api/tracks")).map(::parseTrack)
 
-    suspend fun playlists(): List<Playlist> = JSONArray(call("GET", "/api/playlists")).map {
-        Playlist(it.getLong("id"), it.optString("name"), it.optInt("count"), it.str("cover"), it.optInt("pending"))
-    }
+    suspend fun playlists(): List<Playlist> = JSONArray(call("GET", "/api/playlists")).map(::parsePlaylist)
 
     suspend fun playlistTracks(id: Long): List<Track> = JSONObject(call("GET", "/api/playlists/$id")).getJSONArray("tracks").map(::parseTrack)
+
+    suspend fun createPlaylist(name: String, trackIds: List<Long>): Playlist =
+        parsePlaylist(JSONObject(call("POST", "/api/playlists", JSONObject().put("name", name).put("trackIds", JSONArray(trackIds)))))
+
+    suspend fun renamePlaylist(id: Long, name: String): Playlist =
+        parsePlaylist(JSONObject(call("PATCH", "/api/playlists/$id", JSONObject().put("name", name))))
+
+    suspend fun deletePlaylist(id: Long) { call("DELETE", "/api/playlists/$id") }
+
+    suspend fun addToPlaylist(id: Long, trackIds: List<Long>) {
+        call("POST", "/api/playlists/$id/tracks", JSONObject().put("trackIds", JSONArray(trackIds)))
+    }
+
+    suspend fun removeFromPlaylist(id: Long, trackId: Long) { call("DELETE", "/api/playlists/$id/tracks/$trackId") }
+
+    /** Checks the playlist's original link for new songs. Returns a short message for the user. */
+    suspend fun syncPlaylist(id: Long): String = queuedMessage(JSONObject(call("POST", "/api/playlists/$id/sync", JSONObject())))
 
     suspend fun search(q: String, source: String): List<SearchResult> =
         JSONArray(call("GET", "/api/search?q=${enc(q)}&source=$source")).map {
@@ -199,26 +281,37 @@ class Api(ctx: Context, private val prefs: Prefs) {
                 artist = it.optString("artist"),
                 duration = it.dbl("duration"),
                 thumbnail = it.str("thumbnail"),
-                trackId = if (it.isNull("trackId") || !it.has("trackId")) null else it.getLong("trackId"),
+                trackId = it.lng("trackId"),
             )
         }
 
     /** Starts downloading a link (song, album or playlist) on the server. Returns a short message for the user. */
-    suspend fun importUrl(url: String): String {
-        val r = JSONObject(call("POST", "/api/import", JSONObject().put("url", url)))
+    suspend fun importUrl(url: String): String = queuedMessage(JSONObject(call("POST", "/api/import", JSONObject().put("url", url))))
+
+    private fun queuedMessage(r: JSONObject): String {
         val queued = r.optInt("queued")
-        return when {
-            queued > 0 -> "Downloading ${if (queued == 1) "1 song" else "$queued songs"}"
-            else -> "Already in your library"
-        }
+        return if (queued > 0) "Downloading ${if (queued == 1) "1 song" else "$queued songs"}" else "Already in your library"
     }
 
     suspend fun jobs(): List<Job> = JSONObject(call("GET", "/api/jobs")).getJSONArray("jobs").map {
-        Job(it.getLong("id"), it.optString("status"), it.str("title"), it.str("artist"), it.str("url"), it.optDouble("progress", 0.0), it.str("error"))
+        Job(
+            id = it.getLong("id"),
+            status = it.optString("status"),
+            title = it.str("title"),
+            artist = it.str("artist"),
+            url = it.str("url"),
+            progress = it.optDouble("progress", 0.0),
+            error = it.str("error"),
+            source = it.str("source"),
+            thumbnail = it.str("thumbnail"),
+            trackId = it.lng("trackId"),
+        )
     }
 
     suspend fun cancelJob(id: Long) { call("POST", "/api/jobs/$id/cancel", JSONObject()) }
     suspend fun retryJob(id: Long) { call("POST", "/api/jobs/$id/retry", JSONObject()) }
+    suspend fun retryFailed() { call("POST", "/api/jobs/retry-failed", JSONObject()) }
+    suspend fun cancelAll() { call("POST", "/api/jobs/cancel-all", JSONObject()) }
     suspend fun clearFinished() { call("DELETE", "/api/jobs/finished") }
 
     suspend fun setLiked(id: Long, liked: Boolean) { call("PATCH", "/api/tracks/$id", JSONObject().put("liked", liked)) }

@@ -61,7 +61,7 @@ export function extractColor(src: string): Promise<string | null> {
 }
 
 export function useCoverColor(raw?: string | null): string | null {
-  const src = img(raw);
+  const src = img(raw, 32); // only the average color is needed, so the smallest size will do
   const [color, setColor] = useState<string | null>(src ? cache.get(src) ?? null : null);
   useEffect(() => {
     let alive = true;

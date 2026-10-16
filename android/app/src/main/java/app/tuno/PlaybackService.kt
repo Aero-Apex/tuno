@@ -7,6 +7,7 @@ import androidx.media3.datasource.DataSourceBitmapLoader
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
@@ -27,7 +28,9 @@ class PlaybackService : MediaSessionService() {
             .setUpstreamDataSourceFactory(upstream)
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
 
-        val player = ExoPlayer.Builder(this)
+        // If a phone's preferred audio decoder fails to start, try the next one instead of giving up on the song.
+        val renderers = DefaultRenderersFactory(this).setEnableDecoderFallback(true)
+        val player = ExoPlayer.Builder(this, renderers)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
             // Songs are small: a modest buffer keeps memory and mobile data use low.
             .setLoadControl(

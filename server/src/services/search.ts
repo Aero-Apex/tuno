@@ -224,6 +224,7 @@ export interface SongMatch {
   id: string;
   source: 'youtube' | 'soundcloud';
   title: string;
+  thumbnail?: string | null;
   score: number;
 }
 
@@ -280,6 +281,7 @@ export async function matchSong(
     id: r.key.split(':')[1],
     source: r.source === 'soundcloud' ? 'soundcloud' : 'youtube',
     title: `${r.artist} - ${r.title}`,
+    thumbnail: r.thumbnail ?? null,
     score,
   });
   const best = (results: SearchResult[]) =>
@@ -302,4 +304,40 @@ export async function matchSong(
   const all = (await Promise.all(searches)).flat();
   const top = best(first ? [first.r, ...all] : all);
   return top && top.s >= ACCEPT ? toMatch(top.r, top.s) : null;
+}
+
+/**
+ * Finds a song when all we have is the words of its name, with no way to tell artist from title
+ * (the "Alximo-paparazzi-dubstep" of a Genius link). The best result contains every word and as few extras as possible.
+ */
+export async function matchWords(words: string[]): Promise<SongMatch | null> {
+  const query = words.join(' ');
+  const want = [...new Set(tokens(query))];
+  if (!want.length) return null;
+  const wantTags = tags(query);
+  const lists = await Promise.all((['ytmusic', 'youtube', 'soundcloud'] as const).map((src) => search(query, src).catch(() => [] as SearchResult[])));
+
+  let best: { r: SearchResult; s: number } | undefined;
+  for (const r of lists.flat()) {
+    if (r.kind !== 'track' || r.source === 'library') continue;
+    const have = tokens(`${r.title} ${r.artist}`);
+    const haveSet = new Set(have);
+    const coverage = want.filter((t) => haveSet.has(t)).length / want.length;
+    if (coverage < 0.8) continue;
+    const extras = have.filter((t) => !want.includes(t) && !FILLER.has(t)).length;
+    let penalty = 0;
+    for (const t of tags(r.title)) if (!wantTags.has(t)) penalty += 0.15; // "slowed", "cover"... unless the link says so
+    const s = coverage - Math.min(0.3, extras * 0.03) - Math.min(0.3, penalty) + (r.source === 'ytmusic' ? 0.05 : 0);
+    if (!best || s > best.s) best = { r, s };
+  }
+  if (!best || best.s < 0.6) return null;
+  const r = best.r;
+  return {
+    url: r.url,
+    id: r.key.split(':')[1],
+    source: r.source === 'soundcloud' ? 'soundcloud' : 'youtube',
+    title: `${r.artist} - ${r.title}`,
+    thumbnail: r.thumbnail ?? null,
+    score: best.s,
+  };
 }

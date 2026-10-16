@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, Ban, CheckCircle2, Clock, Download, Link2, Loader2, RotateCcw, Search, X } from 'lucide-react';
+import { AlertCircle, Ban, CheckCircle2, Clock, Download, Link2, Loader2, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Cover } from '../components/Cover';
 import { Empty, Page } from '../components/Page';
 import { api, type Job } from '../lib/api';
+import { useActions } from '../lib/actions';
 import { fmtAgo, SOURCE_COLOR, SOURCE_LABEL } from '../lib/format';
 import { useUI } from '../store/ui';
 
@@ -19,6 +20,7 @@ export function DownloadsPage() {
   const { data, refetch } = useQuery({ queryKey: ['jobs'], queryFn: api.jobs });
   const [filter, setFilter] = useState<(typeof FILTERS)[number]['id']>('all');
   const openImport = useUI((s) => s.openImport);
+  const actions = useActions();
   const jobs = data?.jobs ?? [];
   const count = (s: Job['status'][]) => jobs.filter((j) => s.includes(j.status)).length;
   const active = count(['running', 'queued']);
@@ -81,7 +83,14 @@ export function DownloadsPage() {
       ) : (
         <div className="space-y-1">
           {shown.map((j) => (
-            <JobRow key={j.id} job={j} onAction={act} />
+            <JobRow
+              key={j.id}
+              job={j}
+              onAction={act}
+              onDelete={() => {
+                if (j.trackId) actions.deleteTrack({ id: j.trackId, title: j.title ?? j.query ?? j.url ?? 'this song' });
+              }}
+            />
           ))}
         </div>
       )}
@@ -89,7 +98,7 @@ export function DownloadsPage() {
   );
 }
 
-function JobRow({ job: j, onAction }: { job: Job; onAction: (fn: () => Promise<unknown>) => void }) {
+function JobRow({ job: j, onAction, onDelete }: { job: Job; onAction: (fn: () => Promise<unknown>) => void; onDelete: () => void }) {
   const source = j.source ?? 'web';
   return (
     <div className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-text/5">
@@ -148,6 +157,11 @@ function JobRow({ job: j, onAction }: { job: Job; onAction: (fn: () => Promise<u
         {(j.status === 'error' || j.status === 'canceled') && (
           <button onClick={() => onAction(() => api.retryJob(j.id))} className="icon-btn" title="Retry" aria-label="Retry">
             <RotateCcw className="h-4 w-4" />
+          </button>
+        )}
+        {j.status === 'done' && !!j.trackId && (
+          <button onClick={onDelete} className="icon-btn hover:text-red-400" title="Delete song from library" aria-label={`Delete ${j.title ?? 'song'} from library`}>
+            <Trash2 className="h-4 w-4" />
           </button>
         )}
       </div>

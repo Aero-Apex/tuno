@@ -24,6 +24,8 @@ export function Menu({ items, at, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState(at);
   const [sub, setSub] = useState<number | null>(null);
+  const subRef = useRef<HTMLDivElement>(null);
+  const [subPlace, setSubPlace] = useState({ flip: false, dy: 0 });
 
   useLayoutEffect(() => {
     if (!at || !ref.current) return;
@@ -33,6 +35,16 @@ export function Menu({ items, at, onClose }: Props) {
       y: Math.max(8, Math.min(at.y, window.innerHeight - r.height - 8)),
     });
   }, [at]);
+
+  // Keep the submenu on screen: open it to the left near the right edge, and nudge it up near the bottom.
+  useLayoutEffect(() => {
+    const el = subRef.current;
+    if (sub === null || !el || !ref.current || window.matchMedia('(max-width: 639px)').matches) return setSubPlace({ flip: false, dy: 0 });
+    const menu = ref.current.getBoundingClientRect();
+    const top = el.parentElement!.getBoundingClientRect().top;
+    const dy = Math.max(8 - top, Math.min(0, window.innerHeight - 8 - (top + el.offsetHeight)));
+    setSubPlace({ flip: menu.right + el.offsetWidth + 4 > window.innerWidth - 8, dy });
+  }, [sub, pos]);
 
   useEffect(() => {
     if (!at) return;
@@ -66,7 +78,8 @@ export function Menu({ items, at, onClose }: Props) {
             <button
               disabled={item.disabled}
               onClick={() => {
-                if (item.submenu) return setSub(sub === i ? null : i);
+                // Hover already opened it (and a tap fires hover first), so a click must keep it open, not toggle it shut.
+                if (item.submenu) return setSub(i);
                 item.onClick?.();
                 onClose();
               }}
@@ -79,7 +92,13 @@ export function Menu({ items, at, onClose }: Props) {
               {item.submenu && <ChevronRight className="h-4 w-4 text-muted" />}
             </button>
             {item.submenu && sub === i && (
-              <div className="absolute left-full top-0 z-10 ml-1 max-h-72 min-w-[200px] overflow-y-auto rounded-md bg-elevated p-1 shadow-2xl ring-1 ring-black/20 max-sm:left-auto max-sm:right-0 max-sm:top-full max-sm:ml-0">
+              <div
+                ref={subRef}
+                style={{ transform: subPlace.dy ? `translateY(${subPlace.dy}px)` : undefined }}
+                className={`absolute top-0 z-10 max-h-72 min-w-[200px] overflow-y-auto rounded-md bg-elevated p-1 shadow-2xl ring-1 ring-black/20 max-sm:left-auto max-sm:right-0 max-sm:top-full max-sm:ml-0 max-sm:mr-0 ${
+                  subPlace.flip ? 'right-full mr-1' : 'left-full ml-1'
+                }`}
+              >
                 {item.submenu.map((s, j) =>
                   s.divider ? (
                     <div key={j} className="my-1 h-px bg-text/10" />

@@ -3,6 +3,7 @@ import { Heart, Link2, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Cover } from '../components/Cover';
+import { usePlaylistMenu } from '../components/PlaylistMenu';
 import { Card, Page, PlayButton, Shelf, shelfItem } from '../components/Page';
 import { api, type Track } from '../lib/api';
 import { useActions } from '../lib/actions';
@@ -69,6 +70,7 @@ export function HomePage() {
   const { data: playlists = [] } = useQuery({ queryKey: ['playlists'], queryFn: api.playlists });
   const { context, playing, playTracks, toggle } = usePlayer(useShallow(contextSlice));
   const currentTrackId = usePlayer((s) => s.queue[s.index]?.track?.id);
+  const playlistMenu = usePlaylistMenu();
 
   const playList = (tracks: Track[], ctx: string) => (context === ctx ? toggle() : playTracks(tracks, 0, ctx));
   const quick = playlists.slice(0, 7);
@@ -122,6 +124,7 @@ export function HomePage() {
               <div key={p.id} className={shelfItem}>
                 <Card
                   to={`/playlist/${p.id}`}
+                  onContextMenu={playlistMenu.onContextMenu(p)}
                   cover={p.cover}
                   mosaic={p.covers}
                   title={p.name}
@@ -147,6 +150,7 @@ export function HomePage() {
           </p>
         )}
       </div>
+      {playlistMenu.element}
     </Page>
   );
 }

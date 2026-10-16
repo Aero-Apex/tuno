@@ -285,7 +285,15 @@ export function serializeTrack(t: TrackRow) {
   };
 }
 
+const jobTrackCover = db.prepare('SELECT cover_path, added_at FROM tracks WHERE id = ?');
+
+/** Jobs show the song's own artwork: the saved track's cover once it exists, otherwise the thumbnail found for that song. */
 export function serializeJob(j: JobRow) {
+  let thumbnail = j.thumbnail;
+  if (j.track_id) {
+    const t = jobTrackCover.get(j.track_id) as { cover_path: string | null; added_at: number } | undefined;
+    if (t?.cover_path) thumbnail = `/api/cover/${j.track_id}?v=${t.added_at}`;
+  }
   return {
     id: j.id,
     status: j.status,
@@ -294,7 +302,7 @@ export function serializeJob(j: JobRow) {
     source: j.source,
     title: j.title,
     artist: j.artist,
-    thumbnail: j.thumbnail,
+    thumbnail,
     playlistId: j.playlist_id,
     trackId: j.track_id,
     progress: j.progress,

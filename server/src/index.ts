@@ -11,11 +11,13 @@ import playlistRoutes from './routes/playlists.js';
 import jobRoutes from './routes/jobs.js';
 import searchRoutes from './routes/search.js';
 import settingsRoutes from './routes/settings.js';
+import updateRoutes from './routes/updates.js';
 import adminRoutes from './routes/admin.js';
 import { startQueue } from './services/queue.js';
 import { backfillSizes, sweepPartials } from './services/library.js';
 import { HttpError } from './http.js';
 import { authPlugin } from './auth.js';
+import { sweepThumbs } from './services/thumbs.js';
 
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL ?? 'info' },
@@ -77,6 +79,7 @@ await app.register(adminRoutes);
 await app.register(jobRoutes);
 await app.register(searchRoutes);
 await app.register(settingsRoutes);
+await app.register(updateRoutes);
 
 app.get('/api/health', async () => ({ ok: true }));
 
@@ -91,6 +94,7 @@ app.setNotFoundHandler((req, reply) => {
 
 backfillSizes(); // storage limits need every song's size
 sweepPartials();
+sweepThumbs();
 setInterval(sweepPartials, 6 * 3_600_000).unref();
 
 await app.listen({ port: config.port, host: config.host });

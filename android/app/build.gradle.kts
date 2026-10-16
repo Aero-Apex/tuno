@@ -20,8 +20,9 @@ android {
         applicationId = "app.tuno"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        // Bumped by hand for each release; -PtunoVersionCode / -PtunoVersionName override them (used to test updates).
+        versionCode = (project.findProperty("tunoVersionCode") as String?)?.toInt() ?: 3
+        versionName = (project.findProperty("tunoVersionName") as String?) ?: "1.2.0"
     }
 
     signingConfigs {
@@ -53,7 +54,10 @@ android {
         jvmTarget = "17"
         freeCompilerArgs += "-opt-in=androidx.media3.common.util.UnstableApi"
     }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     androidResources { localeFilters += listOf("en") }
     packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
 }
@@ -77,4 +81,5 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("androidx.palette:palette-ktx:1.0.0")
 }

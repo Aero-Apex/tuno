@@ -4,7 +4,7 @@ import { addToPlaylist, createPlaylist, deleteTracks } from '../services/library
 import { emit } from '../services/events.js';
 import { cancelPlaylistJobs, importUrl } from '../services/queue.js';
 import { saveDataUrl } from './library.js';
-import { idList, notFound } from '../http.js';
+import { badRequest, idList, notFound } from '../http.js';
 import { currentUser } from '../auth.js';
 
 function summary(p: PlaylistRow) {
@@ -149,6 +149,21 @@ export default async function playlistRoutes(app: FastifyInstance) {
     db.prepare('DELETE FROM playlists WHERE id = ?').run(id);
     emit(user.id, { type: 'playlists' });
     return { ok: true };
+  });
+
+  /** Deletes every song in this account's library that isn't in the playlist, including songs that sit in other playlists. */
+  app.post('/api/playlists/:id/delete-others', async (req) => {
+    const user = currentUser(req);
+    const id = ownPlaylist(req, user.id).id;
+    const { n } = db.prepare('SELECT COUNT(*) AS n FROM playlist_tracks WHERE playlist_id = ?').get(id) as { n: number };
+    // An empty playlist would mean "delete the whole library", so refuse.
+    if (!n) throw badRequest('This playlist is empty. Add some songs first, so there is something to keep.');
+    const ids = (
+      db
+        .prepare('SELECT id FROM tracks WHERE user_id = ? AND id NOT IN (SELECT track_id FROM playlist_tracks WHERE playlist_id = ?)')
+        .all(user.id, id) as { id: number }[]
+    ).map((r) => r.id);
+    return { ...deleteTracks(ids, user.id), trackIds: ids };
   });
 
   app.post('/api/playlists/:id/tracks', async (req) => {

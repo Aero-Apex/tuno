@@ -7,6 +7,8 @@ export interface SpotifyTrack {
   artist: string;
   album?: string | null;
   durationSec?: number | null;
+  /** The song's own artwork (its album cover), when Spotify gives one. */
+  cover?: string | null;
 }
 
 export interface SpotifyCollection {
@@ -103,11 +105,12 @@ async function api<T>(creds: SpotifyCreds, url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-const mapApiTrack = (t: any, album?: string): SpotifyTrack => ({
+const mapApiTrack = (t: any, album?: string, cover?: string | null): SpotifyTrack => ({
   title: t.name,
   artist: (t.artists ?? []).map((a: any) => a.name).join(', ') || 'Unknown artist',
   album: album ?? t.album?.name ?? null,
   durationSec: t.duration_ms ? t.duration_ms / 1000 : null,
+  cover: cover ?? t.album?.images?.[0]?.url ?? null,
 });
 
 /** Full playlists/albums through the Web API (no 100-track limit). Needs a free Spotify developer app. */
@@ -118,17 +121,17 @@ async function fromApi(type: string, id: string, creds: SpotifyCreds): Promise<S
   }
   if (type === 'album') {
     const a = await api<any>(creds, `/albums/${id}`);
-    const tracks: SpotifyTrack[] = a.tracks.items.map((t: any) => mapApiTrack(t, a.name));
+    const tracks: SpotifyTrack[] = a.tracks.items.map((t: any) => mapApiTrack(t, a.name, a.images?.[0]?.url));
     let next = a.tracks.next as string | null;
     while (next) {
       const page = await api<any>(creds, next);
-      tracks.push(...page.items.map((t: any) => mapApiTrack(t, a.name)));
+      tracks.push(...page.items.map((t: any) => mapApiTrack(t, a.name, a.images?.[0]?.url)));
       next = page.next;
     }
     return { kind: 'album', name: a.name, cover: a.images?.[0]?.url, tracks };
   }
   if (type === 'playlist') {
-    const p = await api<any>(creds, `/playlists/${id}?fields=name,images,tracks.next,tracks.items(track(name,duration_ms,artists(name),album(name)))`);
+    const p = await api<any>(creds, `/playlists/${id}?fields=name,images,tracks.next,tracks.items(track(name,duration_ms,artists(name),album(name,images)))`);
     const tracks: SpotifyTrack[] = p.tracks.items.filter((i: any) => i.track?.name).map((i: any) => mapApiTrack(i.track));
     let next = p.tracks.next as string | null;
     while (next) {
