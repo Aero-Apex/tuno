@@ -9,11 +9,12 @@ const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 let clientId: Promise<string> | null = null;
 
 async function fetchClientId(): Promise<string> {
-  const html = await (await fetch('https://soundcloud.com/', { headers: { 'user-agent': UA } })).text();
+  // Bounded: a stalled SoundCloud must fail fast, not hold the search open until a proxy gives up.
+  const html = await (await fetch('https://soundcloud.com/', { headers: { 'user-agent': UA }, signal: AbortSignal.timeout(10_000) })).text();
   const scripts = [...html.matchAll(/<script[^>]+src="(https:\/\/a-v2\.sndcdn\.com\/assets\/[^"]+\.js)"/g)].map((m) => m[1]);
   // The id usually lives in one of the last bundles.
   for (const src of scripts.reverse()) {
-    const js = await (await fetch(src, { headers: { 'user-agent': UA } })).text();
+    const js = await (await fetch(src, { headers: { 'user-agent': UA }, signal: AbortSignal.timeout(10_000) })).text();
     const m = js.match(/client_id\s*:\s*"([0-9a-zA-Z]{32})"/);
     if (m) return m[1];
   }

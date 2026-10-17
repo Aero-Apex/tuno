@@ -152,8 +152,14 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
   if (res.status === 401 && !url.startsWith('/api/auth/')) window.dispatchEvent(new Event(AUTH_LOST));
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    // A proxy in front of the server can answer with an HTML error page; say that instead of a JSON parse error.
+    throw new Error(res.ok ? 'Unexpected reply from the server' : `Server error (${res.status}), try again`);
+  }
   if (!res.ok) throw new Error(data?.error ?? `Request failed (${res.status})`);
   return data as T;
 }
