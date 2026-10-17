@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { db, getSetting, getUserSetting, setSetting, setUserSetting } from '../db.js';
 import { currentUser, requireAdmin } from '../auth.js';
 import { cookiesFile, update as updateYtdlp, version as ytdlpVersion } from '../services/ytdlp.js';
-import type { SpotifyCreds } from '../services/spotify.js';
+import { hasSpotifyKeys, spotifyDownloadsOn, type SpotifyCreds } from '../services/spotify.js';
 import { diskInfo, getDownloadSettings, saveDownloadSettings, type DownloadSettings } from '../services/limits.js';
 
 export default async function settingsRoutes(app: FastifyInstance) {
@@ -12,10 +12,28 @@ export default async function settingsRoutes(app: FastifyInstance) {
     const spotify = getSetting<SpotifyCreds>('spotify', {});
     return {
       theme: getUserSetting<unknown>(user.id, 'theme', null),
-      // Server-wide settings are only shown to the admin.
+      // Everyone can see whether Spotify downloads are on; the keys themselves are only shown to the admin.
+      spotifyDownloads: spotifyDownloadsOn(),
       spotify: user.isAdmin ? { clientId: spotify.clientId ?? '', hasSecret: !!spotify.clientSecret } : null,
       hasCookies: user.isAdmin ? fs.existsSync(cookiesFile) : false,
+      assistantBypass: getUserSetting<boolean>(user.id, 'assistantBypass', false),
     };
+  });
+
+  /** Whether the assistant may make library changes without asking. Each account decides for itself. */
+  app.put('/api/settings/assistant', async (req) => {
+    setUserSetting(currentUser(req).id, 'assistantBypass', !!(req.body as { bypass?: unknown } | null)?.bypass);
+    return { ok: true };
+  });
+
+  app.put('/api/settings/spotify-downloads', async (req, reply) => {
+    requireAdmin(req);
+    const enabled = !!(req.body as { enabled?: unknown } | null)?.enabled;
+    if (enabled && !hasSpotifyKeys()) {
+      return reply.code(400).send({ error: 'Save your Spotify Client ID and Secret first, then turn on downloads.' });
+    }
+    setSetting('spotifyDownloads', enabled);
+    return { ok: true, spotifyDownloads: enabled };
   });
 
   /** Each account has its own theme. */
@@ -33,6 +51,8 @@ export default async function settingsRoutes(app: FastifyInstance) {
       // An empty secret field means "keep the saved one" unless the Client ID was cleared too.
       clientSecret: body.clientId?.trim() ? body.clientSecret?.trim() || current.clientSecret : undefined,
     });
+    // Without keys there is nothing for Spotify downloads to use, so they switch off with them.
+    if (!body.clientId?.trim()) setSetting('spotifyDownloads', false);
     return { ok: true };
   });
 

@@ -13,6 +13,7 @@ import searchRoutes from './routes/search.js';
 import settingsRoutes from './routes/settings.js';
 import updateRoutes from './routes/updates.js';
 import adminRoutes from './routes/admin.js';
+import assistantRoutes from './routes/assistant.js';
 import { startQueue } from './services/queue.js';
 import { backfillSizes, sweepPartials } from './services/library.js';
 import { HttpError } from './http.js';
@@ -80,6 +81,7 @@ await app.register(jobRoutes);
 await app.register(searchRoutes);
 await app.register(settingsRoutes);
 await app.register(updateRoutes);
+await app.register(assistantRoutes);
 
 app.get('/api/health', async () => ({ ok: true }));
 

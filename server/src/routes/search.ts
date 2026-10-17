@@ -7,7 +7,7 @@ import { resolveStream, type StreamInfo } from '../services/ytdlp.js';
 import { currentUser } from '../auth.js';
 import { isPublicUrl, thumbWidth, thumbnailBuffer } from '../services/thumbs.js';
 
-const SOURCES: SearchSource[] = ['youtube', 'ytmusic', 'soundcloud', 'library'];
+const SOURCES: SearchSource[] = ['youtube', 'ytmusic', 'soundcloud', 'spotify', 'library'];
 
 const streamCache = new Map<string, { at: number; info: Promise<StreamInfo> }>();
 const STREAM_TTL = 20 * 60_000;

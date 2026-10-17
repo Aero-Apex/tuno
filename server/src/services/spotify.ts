@@ -146,6 +146,54 @@ async function fromApi(type: string, id: string, creds: SpotifyCreds): Promise<S
   return { kind: 'artist', name: `${artist.name} — Top tracks`, cover: artist.images?.[0]?.url, tracks: top.tracks.map((t: any) => mapApiTrack(t)) };
 }
 
+/** Saved Spotify developer keys (Settings → Spotify, admin only). */
+export function hasSpotifyKeys(): boolean {
+  const creds = getSetting<SpotifyCreds>('spotify', {});
+  return !!(creds.clientId && creds.clientSecret);
+}
+
+/** Spotify downloads are an admin switch that only works once the developer keys are saved. */
+export function spotifyDownloadsOn(): boolean {
+  return getSetting<boolean>('spotifyDownloads', false) && hasSpotifyKeys();
+}
+
+export interface SpotifySearchHit {
+  kind: 'track' | 'playlist';
+  id: string;
+  url: string;
+  title: string;
+  artist: string;
+  album?: string | null;
+  duration?: number | null;
+  thumbnail?: string | null;
+}
+
+/** Tracks and playlists from Spotify's search. Needs the developer keys. */
+export async function searchSpotify(q: string): Promise<SpotifySearchHit[]> {
+  const creds = getSetting<SpotifyCreds>('spotify', {});
+  if (!creds.clientId || !creds.clientSecret) throw new Error('Add your Spotify Client ID and Secret in Settings to search Spotify.');
+  const data = await api<any>(creds, `/search?${new URLSearchParams({ q, type: 'track,playlist', limit: '10' })}`);
+  const tracks: SpotifySearchHit[] = (data.tracks?.items ?? []).filter(Boolean).map((t: any) => ({
+    kind: 'track',
+    id: t.id,
+    url: t.external_urls?.spotify ?? `https://open.spotify.com/track/${t.id}`,
+    title: t.name,
+    artist: (t.artists ?? []).map((a: any) => a.name).join(', ') || 'Unknown artist',
+    album: t.album?.name ?? null,
+    duration: t.duration_ms ? t.duration_ms / 1000 : null,
+    thumbnail: t.album?.images?.[0]?.url ?? null,
+  }));
+  const playlists: SpotifySearchHit[] = (data.playlists?.items ?? []).filter(Boolean).map((p: any) => ({
+    kind: 'playlist',
+    id: p.id,
+    url: p.external_urls?.spotify ?? `https://open.spotify.com/playlist/${p.id}`,
+    title: p.name,
+    artist: p.owner?.display_name ?? 'Spotify',
+    thumbnail: p.images?.[0]?.url ?? null,
+  }));
+  return [...tracks, ...playlists];
+}
+
 export async function resolveSpotify(url: string): Promise<SpotifyCollection> {
   const { type, id } = await parse(url);
   const creds = getSetting<SpotifyCreds>('spotify', {});

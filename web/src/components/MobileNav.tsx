@@ -1,4 +1,4 @@
-import { Link2, ListMusic, Plus } from 'lucide-react';
+import { Bot, Link2, ListMusic, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
@@ -74,6 +74,7 @@ function CreateSheet({ onClose }: { onClose: () => void }) {
           const p = await api.createPlaylist('New playlist');
           navigate(`/playlist/${p.id}`);
         })}
+        {option(<Bot className="h-6 w-6" />, 'Ask the assistant', 'Playlists and downloads, with your approval', () => navigate('/assistant'))}
         {option(<Link2 className="h-6 w-6" />, 'Download from link', 'Paste a link from YouTube, SoundCloud, Spotify…', () => openImport())}
       </div>
     </div>,

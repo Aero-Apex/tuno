@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Cover } from '../components/Cover';
 import { Equalizer } from '../components/Equalizer';
 import { Menu, useMenu } from '../components/Menu';
-import { Card, Empty, Page, PageBar, Shelf, shelfItem } from '../components/Page';
+import { Card, Empty, grid, Page, PageBar, Shelf, shelfItem } from '../components/Page';
 import { SearchBox } from '../components/TopBar';
 import { api, type SearchResult, type SearchSource } from '../lib/api';
 import { useActions } from '../lib/actions';
@@ -13,11 +13,14 @@ import { fmtTime, SOURCE_COLOR, SOURCE_LABEL } from '../lib/format';
 import { fromResult, fromTrack, usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
 
-const TABS: { id: 'all' | SearchSource; label: string }[] = [
+type Tab = 'all' | 'playlists' | SearchSource;
+const TABS: { id: Tab; label: string }[] = [
   { id: 'all', label: 'All' },
+  { id: 'playlists', label: 'Playlists' },
   { id: 'ytmusic', label: 'YT Music' },
   { id: 'youtube', label: 'YouTube' },
   { id: 'soundcloud', label: 'SoundCloud' },
+  { id: 'spotify', label: 'Spotify' },
   { id: 'library', label: 'Your library' },
 ];
 
@@ -56,7 +59,7 @@ function useSource(q: string, source: SearchSource, enabled = true) {
 export function SearchPage() {
   const [params, setParams] = useSearchParams();
   const q = params.get('q')?.trim() ?? '';
-  const tab = (params.get('tab') as 'all' | SearchSource) ?? 'all';
+  const tab = (params.get('tab') as Tab) ?? 'all';
   const { recent, add, remove } = useRecent();
   const navigate = useNavigate();
 
@@ -110,7 +113,7 @@ export function SearchPage() {
           </button>
         ))}
       </div>
-      {tab === 'all' ? <AllResults q={q} /> : <SourceResults q={q} source={tab} />}
+      {tab === 'all' ? <AllResults q={q} /> : tab === 'playlists' ? <PlaylistResults q={q} /> : <SourceResults q={q} source={tab} />}
     </Page>
   );
 }
@@ -182,8 +185,11 @@ function AllResults({ q }: { q: string }) {
   const [, setParams] = useSearchParams();
   const songs = ytm.data?.filter((r) => r.kind === 'track') ?? [];
   const albums = ytm.data?.filter((r) => r.kind === 'album') ?? [];
+  // Library results also hold playlists; the songs section and the top result only use songs.
+  const libTracks = lib.data?.filter((r) => r.kind === 'track') ?? [];
+  const playlists = [...(lib.data ?? []), ...(ytm.data ?? [])].filter((r) => r.kind === 'playlist');
   const actions = useActions();
-  const top = lib.data?.[0] ?? songs[0];
+  const top = libTracks[0] ?? songs[0];
 
   const section = (title: string, source: SearchSource, data: SearchResult[] | undefined, loading: boolean, error: unknown) => (
     <section className="mb-8">
@@ -219,7 +225,7 @@ function AllResults({ q }: { q: string }) {
         </section>
         {section('Songs', 'ytmusic', songs, ytm.isLoading, ytm.error)}
       </div>
-      {(lib.data?.length ?? 0) > 0 && section('In your library', 'library', lib.data, lib.isLoading, lib.error)}
+      {libTracks.length > 0 && section('In your library', 'library', libTracks, lib.isLoading, lib.error)}
       {albums.length > 0 && (
         <Shelf title="Albums">
           {albums.map((a) => (
@@ -239,6 +245,15 @@ function AllResults({ q }: { q: string }) {
           ))}
         </Shelf>
       )}
+      {playlists.length > 0 && (
+        <Shelf title="Playlists">
+          {playlists.map((p) => (
+            <div key={p.key} className={shelfItem}>
+              <PlaylistCard r={p} />
+            </div>
+          ))}
+        </Shelf>
+      )}
       {section('YouTube', 'youtube', yt.data, yt.isLoading, yt.error)}
       {section('SoundCloud', 'soundcloud', sc.data, sc.isLoading, sc.error)}
     </div>
@@ -253,6 +268,7 @@ function SourceResults({ q, source }: { q: string; source: SearchSource }) {
   if (!data?.length) return <Empty icon={<SearchX className="h-12 w-12" />} title={`No results for “${q}”`} body="Try different words, or paste a link." />;
   const tracks = data.filter((r) => r.kind === 'track');
   const albums = data.filter((r) => r.kind === 'album');
+  const playlists = data.filter((r) => r.kind === 'playlist');
   return (
     <div>
       <ResultList results={tracks} />
@@ -267,7 +283,63 @@ function SourceResults({ q, source }: { q: string; source: SearchSource }) {
           </Shelf>
         </div>
       )}
+      {playlists.length > 0 && (
+        <div className="mt-10">
+          <Shelf title="Playlists">
+            {playlists.map((p) => (
+              <div key={p.key} className={shelfItem}>
+                <PlaylistCard r={p} />
+              </div>
+            ))}
+          </Shelf>
+        </div>
+      )}
     </div>
+  );
+}
+
+/** Playlists from YT Music, your library and Spotify. Spotify only shows up once its keys are saved. */
+function PlaylistResults({ q }: { q: string }) {
+  const ytm = useSource(q, 'ytmusic');
+  const lib = useSource(q, 'library');
+  const sp = useSource(q, 'spotify');
+  const lists = [...(lib.data ?? []), ...(ytm.data ?? []), ...(sp.data ?? [])].filter((r) => r.kind === 'playlist');
+  if (!lists.length && (ytm.isLoading || lib.isLoading || sp.isLoading)) return <SkeletonRows n={6} />;
+  return (
+    <div>
+      {sp.error && <p className="mb-4 text-sm text-muted">{(sp.error as Error).message}</p>}
+      {lists.length > 0 ? (
+        <div className={grid}>
+          {lists.map((r) => (
+            <PlaylistCard key={r.key} r={r} />
+          ))}
+        </div>
+      ) : (
+        <Empty icon={<SearchX className="h-12 w-12" />} title={`No playlists for “${q}”`} body="Try different words, or paste a playlist link." />
+      )}
+    </div>
+  );
+}
+
+/** A playlist card. Library playlists open; online ones download to your library. */
+function PlaylistCard({ r }: { r: SearchResult }) {
+  const actions = useActions();
+  const navigate = useNavigate();
+  const fromLibrary = r.source === 'library';
+  return (
+    <Card
+      cover={r.thumbnail}
+      title={r.title}
+      subtitle={`${SOURCE_LABEL[r.source] ?? r.source} · ${r.artist}`}
+      onClick={() => (fromLibrary ? navigate(r.url) : actions.importUrl(r.url))}
+      badge={
+        fromLibrary ? undefined : (
+          <span className="flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 text-xs font-semibold text-white">
+            <CloudDownload className="h-3.5 w-3.5" /> Download playlist
+          </span>
+        )
+      }
+    />
   );
 }
 
@@ -334,11 +406,13 @@ function ResultRow({ r, onPlay }: { r: SearchResult; onPlay: () => void }) {
   const playing = usePlayer((s) => s.playing);
   const menu = useMenu();
   const owned = !!r.trackId;
+  // Spotify tracks can't be streamed, so their row opens the Spotify page instead of playing.
+  const streamable = r.source !== 'spotify';
   const hoverTimer = useRef<number>(undefined);
 
   return (
     <div
-      onDoubleClick={onPlay}
+      onDoubleClick={streamable ? onPlay : undefined}
       onContextMenu={menu.open}
       onPointerEnter={() => {
         if (owned) return;
@@ -347,7 +421,11 @@ function ResultRow({ r, onPlay }: { r: SearchResult; onPlay: () => void }) {
       onPointerLeave={() => clearTimeout(hoverTimer.current)}
       className={`group flex h-row items-center gap-3 rounded px-2 transition-colors hover:bg-text/10 ${menu.isOpen ? 'bg-text/10' : ''}`}
     >
-      <button onClick={() => (isCurrent ? usePlayer.getState().toggle() : onPlay())} className="relative shrink-0" aria-label={`Play ${r.title}`}>
+      <button
+        onClick={() => (!streamable ? window.open(r.url, '_blank', 'noopener') : isCurrent ? usePlayer.getState().toggle() : onPlay())}
+        className="relative shrink-0"
+        aria-label={`Play ${r.title}`}
+      >
         <Cover src={r.thumbnail} className="h-10 w-10 shadow-none" />
         <span className={`cover absolute inset-0 items-center justify-center bg-black/50 ${isCurrent ? 'flex' : 'hidden group-hover:flex'}`}>
           {isCurrent && playing ? <Equalizer /> : <Play className="h-4 w-4 fill-white text-white" />}
@@ -382,8 +460,12 @@ function ResultRow({ r, onPlay }: { r: SearchResult; onPlay: () => void }) {
       </button>
       <Menu
         {...menu.props([
-          { label: 'Play next', icon: <ListStart className="h-4 w-4" />, onClick: () => usePlayer.getState().playNext([fromResult(r)]) },
-          { label: 'Add to queue', icon: <ListEnd className="h-4 w-4" />, onClick: () => usePlayer.getState().addToQueue([fromResult(r)]) },
+          ...(streamable
+            ? [
+                { label: 'Play next', icon: <ListStart className="h-4 w-4" />, onClick: () => usePlayer.getState().playNext([fromResult(r)]) },
+                { label: 'Add to queue', icon: <ListEnd className="h-4 w-4" />, onClick: () => usePlayer.getState().addToQueue([fromResult(r)]) },
+              ]
+            : []),
           ...(owned ? [] : [{ label: 'Download to library', icon: <CloudDownload className="h-4 w-4" />, onClick: () => actions.downloadResult(r).catch(() => {}) }]),
           { label: 'Open original', icon: <ExternalLink className="h-4 w-4" />, onClick: () => window.open(r.url, '_blank', 'noopener') },
         ])}

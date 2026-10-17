@@ -10,6 +10,7 @@ import { TopBar } from './components/TopBar';
 import { useActions } from './lib/actions';
 import { useServerEvents } from './lib/events';
 import { isUrl } from './lib/format';
+import { AssistantPage } from './pages/Assistant';
 import { HomePage } from './pages/Home';
 import { usePlayer } from './store/player';
 import { useTheme } from './store/theme';
@@ -160,6 +161,7 @@ export default function App() {
               <Route path="/album/:name" element={<AlbumPage />} />
               <Route path="/artist/:name" element={<ArtistPage />} />
               <Route path="/downloads" element={<DownloadsPage />} />
+              <Route path="/assistant" element={<AssistantPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<HomePage />} />
             </Routes>

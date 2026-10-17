@@ -7,7 +7,7 @@ import { assertHasRoom } from '../auth.js';
 import { cleanMeta } from './metadata.js';
 import { matchSong, matchWords } from './search.js';
 import { geniusSongWords, isGeniusUrl, titleCase } from './genius.js';
-import { isSpotifyUrl, resolveSpotify } from './spotify.js';
+import { isSpotifyUrl, resolveSpotify, spotifyDownloadsOn } from './spotify.js';
 import { getSoundCloudTrack } from './soundcloud.js';
 import { bestThumb, downloadAudio, probe } from './ytdlp.js';
 
@@ -116,6 +116,9 @@ function positionBase(playlistId: number | null, url: string): number {
 export async function importUrl(userId: number, url: string, opts: { playlistId?: number } = {}): Promise<ImportResult> {
   url = url.trim();
   if (!/^https?:\/\/|^spotify:/i.test(url)) throw new Error('Paste a full link starting with https://');
+  if (isSpotifyUrl(url) && !spotifyDownloadsOn()) {
+    throw new Error('Spotify downloads are turned off. An admin can turn them on in Settings once the Spotify keys are saved.');
+  }
   assertHasRoom(userId);
 
   if (isSpotifyUrl(url)) {

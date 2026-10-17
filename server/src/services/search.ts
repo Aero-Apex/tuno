@@ -3,10 +3,11 @@ import { db } from '../db.js';
 import { runYtdlp, ytdlpError, bestThumb, type FlatEntry } from './ytdlp.js';
 import { cleanMeta, similarity, norm, stripTopic } from './metadata.js';
 import { searchSoundCloudApi } from './soundcloud.js';
+import { searchSpotify } from './spotify.js';
 
 Log.setLevel(Log.Level.NONE);
 
-export type SearchSource = 'youtube' | 'ytmusic' | 'soundcloud' | 'library';
+export type SearchSource = 'youtube' | 'ytmusic' | 'soundcloud' | 'spotify' | 'library';
 
 export interface SearchResult {
   key: string;
@@ -50,9 +51,10 @@ function bigYtmThumb(url?: string): string | undefined {
 
 async function searchYtMusic(q: string): Promise<SearchResult[]> {
   const client = await yt();
-  const [songs, albums] = await Promise.all([
+  const [songs, albums, playlists] = await Promise.all([
     client.music.search(q, { type: 'song' }),
     client.music.search(q, { type: 'album' }).catch(() => null),
+    client.music.search(q, { type: 'playlist' }).catch(() => null),
   ]);
   const out: SearchResult[] = [];
   const songShelf = songs.contents?.find((c: any) => c.type === 'MusicShelf') as any;
@@ -81,6 +83,20 @@ async function searchYtMusic(q: string): Promise<SearchResult[]> {
       title: it.title ?? 'Untitled album',
       artist: it.author?.name || it.artists?.map((a: any) => a.name).join(', ') || 'Unknown artist',
       album: it.year ?? null,
+      thumbnail: bigYtmThumb(it.thumbnail?.contents?.[0]?.url),
+    });
+  }
+  const playlistShelf = playlists?.contents?.find((c: any) => c.type === 'MusicShelf') as any;
+  for (const it of (playlistShelf?.contents ?? []).slice(0, 8)) {
+    if (!it.id) continue;
+    const listId = String(it.id).replace(/^VL/, '');
+    out.push({
+      key: `ytm-playlist:${listId}`,
+      source: 'ytmusic',
+      kind: 'playlist',
+      url: `https://music.youtube.com/playlist?list=${listId}`,
+      title: it.title ?? 'Untitled playlist',
+      artist: it.author?.name || 'YouTube Music',
       thumbnail: bigYtmThumb(it.thumbnail?.contents?.[0]?.url),
     });
   }
@@ -151,6 +167,43 @@ async function searchSoundCloudYtdlp(q: string): Promise<SearchResult[]> {
     });
 }
 
+/** Spotify's tracks and playlists. Tracks can't be streamed, so they're only ever downloaded (and only when downloads are on). */
+async function searchSpotifyResults(q: string): Promise<SearchResult[]> {
+  const hits = await searchSpotify(q);
+  return hits.map((h) => ({
+    key: `sp${h.kind === 'playlist' ? '-pl' : ''}:${h.id}`,
+    source: 'spotify' as const,
+    kind: h.kind,
+    url: h.url,
+    title: h.title,
+    artist: h.artist,
+    album: h.album ?? null,
+    duration: h.duration ?? null,
+    thumbnail: h.thumbnail ?? null,
+  }));
+}
+
+/** Playlists in this account's library whose name matches. Clicking one opens it instead of downloading. */
+function searchLibraryPlaylists(q: string, userId: number): SearchResult[] {
+  const like = `%${q.replace(/[%_]/g, '')}%`;
+  const rows = db
+    .prepare(
+      `SELECT p.id, p.name, p.cover_url, COUNT(pt.track_id) AS songs FROM playlists p
+       LEFT JOIN playlist_tracks pt ON pt.playlist_id = p.id
+       WHERE p.user_id = ? AND p.name LIKE ? GROUP BY p.id ORDER BY p.updated_at DESC LIMIT 30`,
+    )
+    .all(userId, like) as { id: number; name: string; cover_url: string | null; songs: number }[];
+  return rows.map((p) => ({
+    key: `libpl:${p.id}`,
+    source: 'library' as const,
+    kind: 'playlist' as const,
+    url: `/playlist/${p.id}`,
+    title: p.name,
+    artist: `${p.songs} ${p.songs === 1 ? 'song' : 'songs'}`,
+    thumbnail: p.cover_url,
+  }));
+}
+
 function searchLibrary(q: string, userId: number): SearchResult[] {
   const like = `%${q.replace(/[%_]/g, '')}%`;
   const rows = db
@@ -188,13 +241,14 @@ function markOwned(results: SearchResult[], userId: number): SearchResult[] {
 export async function search(q: string, source: SearchSource, userId?: number): Promise<SearchResult[]> {
   q = q.trim();
   if (!q) return [];
-  if (source === 'library') return userId ? searchLibrary(q, userId) : [];
-  const fn = source === 'ytmusic' ? searchYtMusic : source === 'youtube' ? searchYouTube : searchSoundCloud;
+  if (source === 'library') return userId ? [...searchLibrary(q, userId), ...searchLibraryPlaylists(q, userId)] : [];
+  const fn =
+    source === 'ytmusic' ? searchYtMusic : source === 'youtube' ? searchYouTube : source === 'spotify' ? searchSpotifyResults : searchSoundCloud;
   const results = await cached(`${source}:${q.toLowerCase()}`, async () => {
     try {
       return await fn(q);
     } catch (err) {
-      if (source === 'soundcloud') throw err;
+      if (source === 'soundcloud' || source === 'spotify') throw err;
       // The YouTube client's session can go stale on a long-running server; start a fresh one and retry once.
       innertube = null;
       return fn(q);

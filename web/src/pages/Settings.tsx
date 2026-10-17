@@ -17,6 +17,7 @@ const TABS = [
   { id: 'account', label: 'Account', admin: false },
   { id: 'appearance', label: 'Appearance', admin: false },
   { id: 'storage', label: 'Storage', admin: false },
+  { id: 'assistant', label: 'Assistant', admin: false },
   { id: 'users', label: 'Users', admin: true },
   { id: 'sources', label: 'Sources', admin: true },
   { id: 'system', label: 'System', admin: true },
@@ -43,6 +44,7 @@ export function SettingsPage() {
         {tab === 'account' && <Account />}
         {tab === 'appearance' && <Appearance />}
         {tab === 'storage' && <Storage />}
+        {tab === 'assistant' && <AssistantSettings />}
         {tab === 'users' && <Users />}
         {tab === 'sources' && <Sources />}
         {tab === 'system' && <System />}
@@ -74,14 +76,15 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   );
 }
 
-function Toggle({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label: string }) {
+function Toggle({ value, onChange, label, disabled }: { value: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   return (
     <button
       role="switch"
       aria-checked={value}
       aria-label={label}
+      disabled={disabled}
       onClick={() => onChange(!value)}
-      className={`relative h-6 w-11 rounded-full transition-colors ${value ? 'bg-accent' : 'bg-text/25'}`}
+      className={`relative h-6 w-11 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${value ? 'bg-accent' : 'bg-text/25'}`}
     >
       <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-all ${value ? 'left-6' : 'left-1'}`} />
     </button>
@@ -418,6 +421,31 @@ function Sources() {
         <button onClick={saveSpotify} className="btn-accent mt-3">
           Save
         </button>
+        <div className="mt-6">
+          <Row
+            label="Spotify downloads"
+            hint={
+              data?.spotify?.hasSecret && data.spotify.clientId
+                ? 'Lets everyone download songs, albums and playlists from Spotify links and search Spotify.'
+                : 'Save your Client ID and Secret above first. Then you can turn this on.'
+            }
+          >
+            <Toggle
+              value={!!data?.spotifyDownloads}
+              disabled={!data?.spotifyDownloads && !(data?.spotify?.hasSecret && data.spotify.clientId)}
+              label="Spotify downloads"
+              onChange={async (v) => {
+                try {
+                  await api.setSpotifyDownloads(v);
+                  qc.invalidateQueries({ queryKey: ['settings'] });
+                  toast(v ? 'Spotify downloads are on' : 'Spotify downloads are off', 'success');
+                } catch (err) {
+                  toast((err as Error).message, 'error');
+                }
+              }}
+            />
+          </Row>
+        </div>
       </Section>
 
       <Section
@@ -605,6 +633,34 @@ function Stat({ label, value }: { label: string; value: string }) {
       <div className="label">{label}</div>
       <div className="mt-1 text-2xl font-bold">{value}</div>
     </div>
+  );
+}
+
+function AssistantSettings() {
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ['settings'], queryFn: api.settings });
+  const toast = useUI((s) => s.toast);
+  return (
+    <Section
+      title="Assistant"
+      description="The assistant can look through your library and playlists, search for music, and propose new playlists and downloads. You approve each change in the Assistant page."
+    >
+      <Row label="Bypass permissions" hint="Let the assistant make changes straight away, without asking. Off by default.">
+        <Toggle
+          value={!!data?.assistantBypass}
+          label="Bypass permissions"
+          onChange={async (v) => {
+            try {
+              await api.setAssistantBypass(v);
+              qc.invalidateQueries({ queryKey: ['settings'] });
+              toast(v ? 'The assistant will act without asking' : 'The assistant will ask before changing anything', 'success');
+            } catch (err) {
+              toast((err as Error).message, 'error');
+            }
+          }}
+        />
+      </Row>
+    </Section>
   );
 }
 

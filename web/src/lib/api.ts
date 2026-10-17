@@ -49,7 +49,7 @@ export interface Job {
   updatedAt: number;
 }
 
-export type SearchSource = 'ytmusic' | 'youtube' | 'soundcloud' | 'library';
+export type SearchSource = 'ytmusic' | 'youtube' | 'soundcloud' | 'spotify' | 'library';
 
 export interface SearchResult {
   key: string;
@@ -95,9 +95,27 @@ export interface Home {
 
 export interface Settings {
   theme: unknown;
+  /** Whether Spotify links can be downloaded (admin switch, needs the keys below). */
+  spotifyDownloads: boolean;
   /** Only sent to the admin. */
   spotify: { clientId: string; hasSecret: boolean } | null;
   hasCookies: boolean;
+  /** This account lets the assistant make changes without asking. */
+  assistantBypass: boolean;
+}
+
+export interface PendingChange {
+  id: string;
+  description: string;
+}
+
+export interface AssistantReply {
+  reply: string;
+  /** Changes waiting for Approve / Reject. */
+  pending: PendingChange[];
+  /** Changes made straight away (bypass is on). */
+  done: { description: string; result: unknown }[];
+  bypass: boolean;
 }
 
 export interface DownloadSettings {
@@ -220,6 +238,12 @@ export const api = {
   settings: () => get<Settings>('/api/settings'),
   saveTheme: (theme: unknown) => request('PUT', '/api/settings/theme', theme),
   saveSpotify: (clientId: string, clientSecret: string) => request('PUT', '/api/settings/spotify', { clientId, clientSecret }),
+  setSpotifyDownloads: (enabled: boolean) => request<{ spotifyDownloads: boolean }>('PUT', '/api/settings/spotify-downloads', { enabled }),
+  setAssistantBypass: (bypass: boolean) => request('PUT', '/api/settings/assistant', { bypass }),
+
+  assistantChat: (messages: { role: 'user' | 'assistant'; content: string }[]) => request<AssistantReply>('POST', '/api/assistant/chat', { messages }),
+  approveChange: (id: string) => request<{ description: string; result: unknown }>('POST', `/api/assistant/actions/${id}/approve`, {}),
+  rejectChange: (id: string) => request('POST', `/api/assistant/actions/${id}/reject`, {}),
   saveCookies: (text: string) => request('PUT', '/api/settings/cookies', { text }),
   deleteCookies: () => request('DELETE', '/api/settings/cookies'),
   system: () => get<SystemInfo>('/api/system'),

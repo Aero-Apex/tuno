@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Download, HardDrive, Keyboard, Link2, LogOut, Palette, Settings, UserRound } from 'lucide-react';
+import { Bot, Download, HardDrive, Keyboard, Link2, LogOut, Palette, Settings, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { fmtBytes } from '../lib/format';
@@ -51,6 +51,7 @@ export function AccountButton({ ring, className = '' }: { ring?: boolean; classN
       <Menu
         {...menu.props([
           { label: `${user.name} · ${data ? `${fmtBytes(data.used)} of ${fmtBytes(user.quotaBytes)}` : 'Account'}`, icon: <UserRound className="h-4 w-4" />, onClick: () => navigate('/settings?tab=account') },
+          { label: 'Assistant', icon: <Bot className="h-4 w-4" />, onClick: () => navigate('/assistant') },
           { label: 'Settings', icon: <Settings className="h-4 w-4" />, onClick: () => navigate('/settings') },
           { label: 'Appearance', icon: <Palette className="h-4 w-4" />, onClick: () => navigate('/settings?tab=appearance') },
           { label: 'Storage', icon: <HardDrive className="h-4 w-4" />, onClick: () => navigate('/settings?tab=storage') },
