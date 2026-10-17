@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { config } from '../config.js';
 import { search, type SearchSource } from '../services/search.js';
@@ -23,6 +23,46 @@ function getStream(url: string, fresh = false): Promise<StreamInfo> {
   info.catch(() => streamCache.delete(url));
   if (streamCache.size > 200) streamCache.delete(streamCache.keys().next().value!);
   return info;
+}
+
+/**
+ * Starts ffmpeg on an HLS/DASH manifest. Resolves once there is audio to send (the first chunk is put back,
+ * so the response starts with it). Rejects if ffmpeg fails, finishes, or stalls before that.
+ */
+function startTranscode(manifest: string): Promise<ChildProcess> {
+  return new Promise((resolve, reject) => {
+    const ff = spawn(config.ffmpeg, ['-loglevel', 'error', '-i', manifest, '-vn', '-c:a', 'libmp3lame', '-b:a', '192k', '-f', 'mp3', 'pipe:1'], {
+      windowsHide: true,
+    });
+    const stall = setTimeout(() => ff.kill('SIGKILL'), 20_000);
+    let stderr = '';
+    ff.stderr.setEncoding('utf8');
+    ff.stderr.on('data', (chunk: string) => (stderr = (stderr + chunk).slice(-2000)));
+    ff.on('error', (err) => {
+      clearTimeout(stall);
+      reject(err);
+    });
+    ff.on('close', (code) => {
+      clearTimeout(stall);
+      reject(new Error(stderr.trim().split(/\r?\n/).pop() || `ffmpeg exited with code ${code}`));
+    });
+    ff.stdout.once('readable', () => {
+      clearTimeout(stall);
+      const first = ff.stdout.read();
+      if (!first) return; // no audio at all: the close handler reports why
+      ff.stdout.unshift(first);
+      resolve(ff);
+    });
+  });
+}
+
+/** Transcodes a manifest. If ffmpeg fails before producing audio (a stale or hiccuped manifest), resolves the stream once more and tries again. */
+async function transcodeManifest(url: string, manifest: string): Promise<ChildProcess> {
+  try {
+    return await startTranscode(manifest);
+  } catch {
+    return startTranscode((await getStream(url, true)).url);
+  }
 }
 
 /** Remote artwork, kept in memory. Bounded by bytes (not just count) so a few big images can't eat the container's memory. */
@@ -110,9 +150,12 @@ export default async function searchRoutes(app: FastifyInstance) {
 
     if (!info.protocol.startsWith('http')) {
       // HLS/DASH manifests: let ffmpeg turn them into a plain MP3 stream (no seeking).
-      const ff = spawn(config.ffmpeg, ['-loglevel', 'error', '-i', info.url, '-vn', '-c:a', 'libmp3lame', '-b:a', '192k', '-f', 'mp3', 'pipe:1'], {
-        windowsHide: true,
-      });
+      let ff: ChildProcess;
+      try {
+        ff = await transcodeManifest(url, info.url);
+      } catch (err) {
+        return reply.code(502).send({ error: (err as Error).message });
+      }
       req.raw.on('close', () => ff.kill('SIGKILL'));
       reply.type('audio/mpeg');
       return reply.send(ff.stdout);
