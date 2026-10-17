@@ -27,7 +27,7 @@ export const config = {
   /** The assistant's model: an OpenAI-compatible chat endpoint (base URL, key and model name). Off when the key is missing. */
   aiUrl: (process.env.TUNO_AI_URL ?? 'https://euromodels.xyz/v1').replace(/\/$/, ''),
   aiKey: process.env.TUNO_AI_KEY ?? '',
-  aiModel: process.env.TUNO_AI_MODEL ?? 'claude-opus-5.5',
+  aiModel: process.env.TUNO_AI_MODEL ?? 'euromodels/claude-opus-5.5',
 };
 
 fs.mkdirSync(config.dataDir, { recursive: true });

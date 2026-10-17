@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.core.content.FileProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -56,6 +57,8 @@ class UpdateManager(private val app: Application, private val api: Api, private 
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var work: Job? = null
+    /** The verified APK while the app's own installer works on it; kept so a failed session can fall back to the system screen. */
+    private var pendingFile: File? = null
     private val dir get() = File(app.cacheDir, "update")
 
     var auto by mutableStateOf(prefs.autoUpdate)
@@ -116,12 +119,33 @@ class UpdateManager(private val app: Application, private val api: Api, private 
             return
         }
         state = UpdateState.Installing(info)
+        pendingFile = file
         scope.launch {
             try {
                 commit(file)
             } catch (e: Exception) {
-                state = UpdateState.Failed("Couldn't install the update: ${e.message}")
+                fallBack(info, file, e.message)
             }
+        }
+    }
+
+    /**
+     * Some phones' installers refuse the app's own install session (it reports "Session destroyed"). The system's own
+     * install screen takes the same APK on every phone, so when the session fails, that screen opens instead.
+     */
+    private fun fallBack(info: UpdateInfo, file: File, reason: String?) {
+        pendingFile = null
+        try {
+            val uri = FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_INSTALL_PACKAGE)
+                .setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+            val s = UpdateState.NeedsConfirm(info, intent)
+            state = s
+            launchConfirm(app, s)
+        } catch (e: Exception) {
+            state = UpdateState.Failed("Couldn't install the update: ${reason ?: e.message}")
         }
     }
 
@@ -155,9 +179,21 @@ class UpdateManager(private val app: Application, private val api: Api, private 
                 state = s
                 launchConfirm(context, s)
             }
-            PackageInstaller.STATUS_SUCCESS -> Unit // the app is replaced and restarted by Android
-            PackageInstaller.STATUS_FAILURE_ABORTED -> state = UpdateState.Failed("The update was cancelled.")
-            else -> state = UpdateState.Failed(message ?: "The update couldn't be installed ($status).")
+            PackageInstaller.STATUS_SUCCESS -> pendingFile = null // the app is replaced and restarted by Android
+            PackageInstaller.STATUS_FAILURE_ABORTED -> {
+                pendingFile = null
+                state = UpdateState.Failed("The update was cancelled.")
+            }
+            else -> {
+                // The session was refused: let the system's install screen take the same file instead.
+                val file = pendingFile
+                val info = (state as? UpdateState.Installing)?.info
+                if (file != null && info != null) fallBack(info, file, message)
+                else {
+                    pendingFile = null
+                    state = UpdateState.Failed(message ?: "The update couldn't be installed ($status).")
+                }
+            }
         }
     }
 

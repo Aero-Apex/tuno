@@ -39,6 +39,17 @@
 
         <receiver android:name=".InstallReceiver" android:exported="false" />
 
+        <!-- Lets the system's install screen read a downloaded update (the fallback when the app's own installer refuses it). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <service
             android:name=".PlaybackService"
             android:exported="true"
