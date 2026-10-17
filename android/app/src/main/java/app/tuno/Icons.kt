@@ -106,6 +106,11 @@ object TIcons {
     )
     val Paste = vec("Paste", P("M9 4.5h6v2.5H9zM9 5.5H6v15h12v-15h-3", 1.6f))
     val Info = vec("Info", P(CIRCLE, 1.6f), P("M12 11v5.5M12 7.6v.2", 1.9f))
+    val Bot = vec(
+        "Bot",
+        P("M6.5 8.5h11a2.5 2.5 0 0 1 2.5 2.5v6.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5V11a2.5 2.5 0 0 1 2.5-2.5z", 1.7f),
+        P("M12 8.5V5M9.5 4.5h5M9 13.5v1.5M15 13.5v1.5", 1.7f),
+    )
 
     /** The Tuno logo glyph (same shape as the launcher icon). */
     val Logo = vec("Logo", P("M17.5,13h29a4.5,4.5 0,0 1,0 9H42v22.5a10,10 0,1 1,-8 -9.8V22H17.5a4.5,4.5 0,0 1,0 -9z"), viewport = 64f)

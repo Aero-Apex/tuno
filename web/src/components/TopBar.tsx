@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Download, Link2, Loader2, MoreHorizontal, X } from 'lucide-react';
+import { Bot, ChevronLeft, ChevronRight, Download, Link2, Loader2, MoreHorizontal, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { isUrl } from '../lib/format';
@@ -143,6 +143,16 @@ export function TopBar() {
         <SearchBox />
       </div>
       <div className="flex flex-1 items-center justify-end gap-1">
+        <button
+          onClick={() => navigate('/assistant')}
+          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold transition-transform hover:scale-105 ${
+            location.pathname === '/assistant' ? 'bg-text text-bg' : 'text-muted hover:text-text'
+          }`}
+          title="Assistant"
+          aria-label="Assistant"
+        >
+          <Bot className="h-4 w-4" /> <span className="hidden lg:inline">Assistant</span>
+        </button>
         <button onClick={() => openImport()} className="hidden items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold text-muted transition-transform hover:scale-105 hover:text-text lg:flex" title="Download from link">
           <Link2 className="h-4 w-4" /> Add from link
         </button>
@@ -157,6 +167,7 @@ export function TopBar() {
       <Menu
         {...menu.props([
           { label: 'Download from link', icon: <Link2 className="h-4 w-4" />, onClick: () => openImport() },
+          { label: 'Assistant', icon: <Bot className="h-4 w-4" />, onClick: () => navigate('/assistant') },
           { label: 'Downloads', icon: <Download className="h-4 w-4" />, onClick: () => navigate('/downloads') },
           { label: 'Your Library', onClick: () => navigate('/library') },
           { label: 'Liked Songs', onClick: () => navigate('/liked') },

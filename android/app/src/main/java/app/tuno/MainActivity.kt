@@ -163,6 +163,7 @@ private fun App(vm: TunoViewModel) {
                             Tab.Library -> LibraryScreen(vm)
                         }
                         Route.Downloads -> DownloadsScreen(vm)
+                        Route.Assistant -> AssistantScreen(vm)
                         Route.Settings -> SettingsScreen(vm)
                         else -> CollectionScreen(vm, route)
                     }
@@ -252,6 +253,7 @@ private fun ProfileDrawer(vm: TunoViewModel) {
             DrawerItem(TIcons.Download, "Downloads", if (active > 0) "$active" else null) { vm.navigate(Route.Downloads) }
             DrawerItem(TIcons.Clock, "Listening history") { vm.navigate(Route.Recents) }
             DrawerItem(TIcons.Link, "Download from link") { vm.drawerOpen = false; vm.sheet = Sheet.Link() }
+            DrawerItem(TIcons.Bot, "Assistant") { vm.navigate(Route.Assistant) }
             DrawerItem(TIcons.Settings, "Settings and privacy") { vm.navigate(Route.Settings) }
             DrawerItem(TIcons.Logout, "Log out") { vm.logout() }
         }

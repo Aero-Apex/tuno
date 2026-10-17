@@ -104,6 +104,16 @@ export interface Settings {
   assistantBypass: boolean;
 }
 
+/** A published app build, as the server's update feed describes it. */
+export interface AppInfo {
+  version: string;
+  versionCode?: number;
+  size: number;
+  sha256: string;
+  url: string;
+  notes?: string | null;
+}
+
 export interface PendingChange {
   id: string;
   description: string;
@@ -238,6 +248,8 @@ export const api = {
   settings: () => get<Settings>('/api/settings'),
   saveTheme: (theme: unknown) => request('PUT', '/api/settings/theme', theme),
   saveSpotify: (clientId: string, clientSecret: string) => request('PUT', '/api/settings/spotify', { clientId, clientSecret }),
+  /** The newest published build for an app (the same feed the installed apps update from). */
+  appLatest: (platform: 'windows' | 'android') => request<AppInfo>('GET', `/api/app/latest?platform=${platform}`).catch(() => null),
   setSpotifyDownloads: (enabled: boolean) => request<{ spotifyDownloads: boolean }>('PUT', '/api/settings/spotify-downloads', { enabled }),
   setAssistantBypass: (bypass: boolean) => request('PUT', '/api/settings/assistant', { bypass }),
 

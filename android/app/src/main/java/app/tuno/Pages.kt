@@ -39,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -62,6 +63,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // ---------------------------------------------------------------- Login / start-up
 
@@ -344,6 +346,8 @@ fun SettingsScreen(vm: TunoViewModel) {
 
             UpdateSettings(vm)
 
+            AssistantSettings(vm)
+
             SettingsHeading("About")
             SettingRow("Server", vm.server)
 
@@ -400,6 +404,40 @@ private fun UpdateSettings(vm: TunoViewModel) {
                 CircularProgressIndicator(Modifier.size(22.dp), color = accent.color, strokeWidth = 2.dp)
             else -> PillButton("Check now", { u.checkForUpdate(manual = true) }, filled = false)
         }
+    }
+}
+
+@Composable
+private fun AssistantSettings(vm: TunoViewModel) {
+    val chat = vm.assistant
+    val scope = rememberCoroutineScope()
+    val accent = LocalAccent.current
+    val setBypass = { on: Boolean ->
+        scope.launch {
+            val problem = chat.setBypass(on)
+            if (problem != null) vm.message = problem
+        }
+    }
+    SettingsHeading("Assistant")
+    SettingRow("Ask the assistant", "Find songs, make playlists and download music. You approve each change.", onClick = { vm.navigate(Route.Assistant) }) {
+        Icon(TIcons.ChevronRight, null, tint = S.Subdued, modifier = Modifier.size(18.dp))
+    }
+    SettingRow(
+        "Bypass permissions",
+        "Let the assistant make changes straight away, without asking. Off by default.",
+        onClick = { setBypass(!chat.bypass) },
+    ) {
+        Switch(
+            checked = chat.bypass,
+            onCheckedChange = { setBypass(it) },
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = accent.color,
+                checkedThumbColor = accent.on,
+                uncheckedTrackColor = S.Pressed,
+                uncheckedThumbColor = S.Subdued,
+                uncheckedBorderColor = S.Pressed,
+            ),
+        )
     }
 }
 

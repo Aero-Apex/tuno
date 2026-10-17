@@ -317,4 +317,22 @@ class Api(ctx: Context, private val prefs: Prefs) {
     suspend fun setLiked(id: Long, liked: Boolean) { call("PATCH", "/api/tracks/$id", JSONObject().put("liked", liked)) }
     suspend fun deleteTrack(id: Long) { call("DELETE", "/api/tracks/$id") }
     suspend fun markPlayed(id: Long) { runCatching { call("POST", "/api/tracks/$id/play", JSONObject()) } }
+
+    // ---- the assistant (the server's services/assistant.ts) ----
+
+    suspend fun assistantChat(messages: List<Pair<String, String>>): AssistantReply {
+        val list = JSONArray()
+        for ((role, content) in messages) list.put(JSONObject().put("role", role).put("content", content))
+        val r = JSONObject(call("POST", "/api/assistant/chat", JSONObject().put("messages", list)))
+        return AssistantReply(
+            reply = r.optString("reply"),
+            pending = r.optJSONArray("pending")?.map { PendingChange(it.getString("id"), it.getString("description")) }.orEmpty(),
+            done = r.optJSONArray("done")?.map { it.optString("description") }.orEmpty(),
+        )
+    }
+
+    suspend fun approveChange(id: String) { call("POST", "/api/assistant/actions/$id/approve", JSONObject()) }
+    suspend fun rejectChange(id: String) { call("POST", "/api/assistant/actions/$id/reject", JSONObject()) }
+    suspend fun assistantBypass(): Boolean = JSONObject(call("GET", "/api/settings")).optBoolean("assistantBypass")
+    suspend fun setAssistantBypass(on: Boolean) { call("PUT", "/api/settings/assistant", JSONObject().put("bypass", on)) }
 }

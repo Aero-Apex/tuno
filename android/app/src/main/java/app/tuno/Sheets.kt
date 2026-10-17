@@ -202,6 +202,7 @@ private fun CreateSheet(vm: TunoViewModel, close: () -> Unit) {
     SpotifySheet(close) {
         CreateRow(TIcons.Note, "Playlist", "Build a playlist with songs from your library") { vm.sheet = Sheet.NewPlaylist() }
         CreateRow(TIcons.Link, "Download from link", "Save songs, albums or playlists from YouTube, Spotify, SoundCloud and more") { vm.sheet = Sheet.Link() }
+        CreateRow(TIcons.Bot, "Ask the assistant", "Playlists and downloads, with your approval") { vm.navigate(Route.Assistant) }
         CreateRow(TIcons.Search, "Search and download", "Find any song and keep it in your library") { close(); vm.selectTab(Tab.Search) }
     }
 }

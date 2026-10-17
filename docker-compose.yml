@@ -12,6 +12,10 @@ services:
     init: true
     ports:
       - "7070:7070"
+    # Secrets (the AI assistant's key) live in ~/tuno/tuno.env on the server, outside the app folder that each deploy replaces.
+    env_file:
+      - path: ../tuno.env
+        required: false
     environment:
       - TZ=Etc/UTC
       - TUNO_CONCURRENCY=3

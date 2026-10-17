@@ -408,25 +408,6 @@ namespace TunoApp
         }
     }
 
-    /// <summary>Dark colors for the menu bar, so it matches the player.</summary>
-    sealed class DarkColors : ProfessionalColorTable
-    {
-        static readonly Color Panel = Color.FromArgb(20, 20, 20), Drop = Color.FromArgb(32, 32, 32), Hover = Color.FromArgb(62, 62, 62);
-        public override Color MenuStripGradientBegin { get { return Panel; } }
-        public override Color MenuStripGradientEnd { get { return Panel; } }
-        public override Color ToolStripDropDownBackground { get { return Drop; } }
-        public override Color ImageMarginGradientBegin { get { return Drop; } }
-        public override Color ImageMarginGradientMiddle { get { return Drop; } }
-        public override Color ImageMarginGradientEnd { get { return Drop; } }
-        public override Color MenuBorder { get { return Hover; } }
-        public override Color MenuItemBorder { get { return Hover; } }
-        public override Color MenuItemSelected { get { return Hover; } }
-        public override Color MenuItemSelectedGradientBegin { get { return Hover; } }
-        public override Color MenuItemSelectedGradientEnd { get { return Hover; } }
-        public override Color MenuItemPressedGradientBegin { get { return Hover; } }
-        public override Color MenuItemPressedGradientEnd { get { return Hover; } }
-    }
-
     sealed class MainForm : Form
     {
         const int CmdChangeServer = 0x1010, CmdReload = 0x1020, CmdCheckUpdate = 0x1030, CmdAutoUpdate = 0x1040;
@@ -447,61 +428,55 @@ namespace TunoApp
 
         static bool AutoUpdate { get { return Settings.Get("autoUpdate") != "0"; } }
 
-        // ---- menu bar: the Update button is always in sight (the same actions also sit in the title bar's menu) ----
-
-        MenuStrip menuBar;
-        ToolStripMenuItem updateItem, autoItem;
         Version pendingVersion;
 
-        static ToolStripMenuItem Entry(string text, EventHandler onClick)
-        {
-            var item = new ToolStripMenuItem(text, null, onClick) { ForeColor = Color.White };
-            return item;
-        }
+        // ---- the Settings → Updates section of the web page talks to the updater through these messages ----
 
-        void BuildMenu()
+        /// <summary>Tells the page what the updater is doing.</summary>
+        void PostStatus(string state, Version found, string message)
         {
-            menuBar = new MenuStrip { BackColor = Color.FromArgb(20, 20, 20), ForeColor = Color.White, Renderer = new ToolStripProfessionalRenderer(new DarkColors()) };
-
-            var tuno = Entry("Tuno", null);
-            tuno.DropDownItems.Add(Entry("Change server...", delegate { ChangeServer(); }));
-            tuno.DropDownItems.Add(Entry("Reload", delegate { if (web.CoreWebView2 != null) Navigate(); }));
-            tuno.DropDownItems.Add(new ToolStripSeparator());
-            autoItem = Entry("Update automatically", delegate
+            CoreWebView2 core = web.CoreWebView2;
+            if (core == null) return;
+            Version version = found ?? pendingVersion;
+            var msg = new Dictionary<string, object>
             {
-                bool on = !AutoUpdate;
-                Settings.Set("autoUpdate", on ? "1" : "0");
-                autoItem.Checked = on;
-            });
-            autoItem.Checked = AutoUpdate;
-            tuno.DropDownItems.Add(autoItem);
-
-            updateItem = Entry("Update", delegate { OnUpdateClicked(); });
-            menuBar.Items.Add(tuno);
-            menuBar.Items.Add(updateItem);
-            Controls.Add(menuBar); // added after the page, so the bar docks along the top and the page fills the rest
-            MainMenuStrip = menuBar;
-            UpdateMenuText();
+                { "type", "update-status" },
+                { "state", state },
+                { "auto", AutoUpdate },
+                { "version", version != null ? version.ToString() : null },
+                { "message", message ?? "" },
+            };
+            core.PostWebMessageAsJson(new JavaScriptSerializer().Serialize(msg));
         }
 
-        /// <summary>The Update button says what a click will do: check now, restart into a downloaded update, or wait.</summary>
-        void UpdateMenuText()
+        string CurrentState()
         {
-            if (updateItem == null) return;
-            updateItem.Text = checking ? "Checking for updates..." : pendingReady && pendingVersion != null ? "Restart to update to " + pendingVersion : "Update";
+            return checking ? "checking" : pendingReady && pendingVersion != null ? "ready" : "idle";
         }
 
-        void OnUpdateClicked()
+        void OnWebMessage(object sender, CoreWebView2WebMessageReceivedEventArgs e)
         {
-            if (checking || server == null) return;
-            if (pendingReady && pendingVersion != null)
+            Dictionary<string, object> msg;
+            try { msg = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(e.WebMessageAsJson); }
+            catch { return; }
+            if (msg == null) return;
+            object type;
+            if (!msg.TryGetValue("type", out type)) return;
+            string kind = type as string;
+            if (kind == "check-update") StartUpdateCheck(false, true);
+            else if (kind == "install-update")
             {
-                if (MessageBox.Show(this, "Restart Tuno now to install " + pendingVersion + "?", "Tuno",
-                        MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-                    RestartIntoUpdate();
-                return;
+                if (pendingReady && pendingVersion != null) RestartIntoUpdate();
+                else PostStatus(CurrentState(), null, "Nothing is ready to install.");
             }
-            StartUpdateCheck(true);
+            else if (kind == "set-auto")
+            {
+                object on;
+                bool turnOn = msg.TryGetValue("on", out on) && on is bool && (bool)on;
+                Settings.Set("autoUpdate", turnOn ? "1" : "0");
+                PostStatus(CurrentState(), null, null);
+            }
+            else if (kind == "get-status") PostStatus(CurrentState(), null, null);
         }
 
         public MainForm(string address)
@@ -524,7 +499,6 @@ namespace TunoApp
                 AdditionalBrowserArguments = BrowserArgs + " " + (Settings.Get("extraBrowserArgs") ?? ""),
             };
             Controls.Add(web);
-            BuildMenu();
             Shown += delegate { Begin(); };
         }
 
@@ -647,11 +621,16 @@ namespace TunoApp
             catch { }
         }
 
-        void StartUpdateCheck(bool manual)
+        /// <summary>Checks the server for a newer Tuno. From the web page's Updates section the result goes back to the page, not to a dialog.</summary>
+        void StartUpdateCheck(bool manual, bool fromWeb = false)
         {
-            if (checking || server == null) return;
+            if (checking || server == null)
+            {
+                if (fromWeb) PostStatus(CurrentState(), null, server == null ? "Connect to a server first." : "Already checking.");
+                return;
+            }
             checking = true;
-            UpdateMenuText();
+            if (fromWeb) PostStatus("checking", null, null);
             string target = server;
             Task.Run(delegate
             {
@@ -665,8 +644,12 @@ namespace TunoApp
                         // A failed check (server asleep, VPN off) is retried in half an hour; a good one in six hours.
                         lastCheck = found != null || message.StartsWith("Tuno ") ? DateTime.UtcNow : DateTime.UtcNow - TimeSpan.FromHours(5.5);
                         if (found != null) { pendingReady = true; pendingVersion = found; }
-                        UpdateMenuText();
-                        if (manual) ShowUpdateResult(found, message);
+                        if (fromWeb)
+                        {
+                            string state = found != null ? "ready" : message.Contains("latest version") ? "uptodate" : "error";
+                            PostStatus(state, found, message);
+                        }
+                        else if (manual) ShowUpdateResult(found, message);
                     });
                 }
                 catch (InvalidOperationException) { /* window closed meanwhile */ }
@@ -694,7 +677,6 @@ namespace TunoApp
             {
                 pendingReady = false;
                 pendingVersion = null;
-                UpdateMenuText();
                 tick.Start();
             }
         }
@@ -774,6 +756,8 @@ namespace TunoApp
             st.IsSwipeNavigationEnabled = false;
             st.IsPinchZoomEnabled = false;
             try { core.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Dark; } catch { }
+            // The web page reads this to show the Windows update controls in Settings → Updates.
+            try { st.UserAgent = st.UserAgent + " TunoWindows/" + Updater.Current; } catch { }
 
             core.NavigationCompleted += OnNavigationCompleted;
             core.NewWindowRequested += delegate (object s, CoreWebView2NewWindowRequestedEventArgs e)
@@ -790,6 +774,7 @@ namespace TunoApp
             core.ProcessFailed += OnProcessFailed;
             core.WebMessageReceived += delegate (object s, CoreWebView2WebMessageReceivedEventArgs e)
             {
+                OnWebMessage(s, e); // the Settings → Updates section sends object messages; plain strings are ignored there
                 string msg;
                 try { msg = e.TryGetWebMessageAsString(); } catch { return; }
                 if (msg == "change-server") ChangeServer();

@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Download, HardDrive, ImagePlus, Loader2, RefreshCw, RotateCcw, Trash2, Upload } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { AppUpdates } from '../components/AppUpdates';
 import { readImage } from '../components/Dialogs';
 import { Page } from '../components/Page';
 import { Storage } from './Storage';
@@ -17,6 +18,7 @@ const TABS = [
   { id: 'account', label: 'Account', admin: false },
   { id: 'appearance', label: 'Appearance', admin: false },
   { id: 'storage', label: 'Storage', admin: false },
+  { id: 'updates', label: 'Updates', admin: false },
   { id: 'assistant', label: 'Assistant', admin: false },
   { id: 'users', label: 'Users', admin: true },
   { id: 'sources', label: 'Sources', admin: true },
@@ -44,6 +46,7 @@ export function SettingsPage() {
         {tab === 'account' && <Account />}
         {tab === 'appearance' && <Appearance />}
         {tab === 'storage' && <Storage />}
+        {tab === 'updates' && <AppUpdates />}
         {tab === 'assistant' && <AssistantSettings />}
         {tab === 'users' && <Users />}
         {tab === 'sources' && <Sources />}
@@ -645,6 +648,9 @@ function AssistantSettings() {
       title="Assistant"
       description="The assistant can look through your library and playlists, search for music, and propose new playlists and downloads. You approve each change in the Assistant page."
     >
+      <Link to="/assistant" className="btn-accent mb-6">
+        Open the assistant
+      </Link>
       <Row label="Bypass permissions" hint="Let the assistant make changes straight away, without asking. Off by default.">
         <Toggle
           value={!!data?.assistantBypass}

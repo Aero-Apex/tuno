@@ -38,6 +38,7 @@ sealed interface Route {
     data class AlbumPage(val name: String) : Route
     data object Recents : Route
     data object Downloads : Route
+    data object Assistant : Route
     data object Settings : Route
 }
 
@@ -74,6 +75,7 @@ class TunoViewModel(app: Application) : AndroidViewModel(app) {
     val api = tuno.api
     val player = PlayerState(app, api)
     val updates = tuno.updates
+    val assistant = AssistantChat(api)
 
     var session by mutableStateOf(Session.Loading)
         private set
