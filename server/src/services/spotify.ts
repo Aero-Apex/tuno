@@ -152,9 +152,12 @@ export function hasSpotifyKeys(): boolean {
   return !!(creds.clientId && creds.clientSecret);
 }
 
-/** Spotify downloads are an admin switch that only works once the developer keys are saved. */
+/**
+ * Spotify downloads are an admin switch that only works once the developer keys are saved. A server that already
+ * has keys starts with the switch on, so Spotify links keep working after an update; the admin can turn it off.
+ */
 export function spotifyDownloadsOn(): boolean {
-  return getSetting<boolean>('spotifyDownloads', false) && hasSpotifyKeys();
+  return getSetting<boolean>('spotifyDownloads', hasSpotifyKeys()) && hasSpotifyKeys();
 }
 
 export interface SpotifySearchHit {

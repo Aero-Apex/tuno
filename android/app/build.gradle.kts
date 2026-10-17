@@ -21,8 +21,8 @@ android {
         minSdk = 26
         targetSdk = 35
         // Bumped by hand for each release; -PtunoVersionCode / -PtunoVersionName override them (used to test updates).
-        versionCode = (project.findProperty("tunoVersionCode") as String?)?.toInt() ?: 6
-        versionName = (project.findProperty("tunoVersionName") as String?) ?: "1.1.2"
+        versionCode = (project.findProperty("tunoVersionCode") as String?)?.toInt() ?: 8
+        versionName = (project.findProperty("tunoVersionName") as String?) ?: "1.1.3"
     }
 
     signingConfigs {
