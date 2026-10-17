@@ -6,3 +6,6 @@ library/
 .env
 .claude/
 *.apk
+
+# Kotlin compiler cache
+android/.kotlin/
