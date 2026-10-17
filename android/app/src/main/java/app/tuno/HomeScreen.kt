@@ -74,7 +74,7 @@ fun HomeScreen(vm: TunoViewModel) {
                 })
             }
         }
-    }.distinctBy { it.key }.take(8).let { if (it.size % 2 == 1 && it.size > 1) it.dropLast(1) else it }
+    }.distinctBy { it.key }.take(8)
 
     Box(Modifier.fillMaxSize()) {
         // Spotify's soft color wash behind the top of Home.
@@ -107,7 +107,7 @@ fun HomeScreen(vm: TunoViewModel) {
             }
 
             if (filter != 2) {
-                trackCarousel(vm, "Jump back in", recentlyPlayed, PlayContext("recent", "recent", "Recently played"))
+                trackCarousel(vm, "Jump back in", recentlyPlayed, PlayContext("recent", "recent", "Recently played"), big = true)
                 trackCarousel(vm, "Recently added", recentlyAdded, PlayContext("added", "recent", "Recently added"))
                 trackCarousel(vm, "On repeat", onRepeat, PlayContext("repeat", "recent", "On repeat"))
             }
@@ -169,14 +169,17 @@ fun HomeScreen(vm: TunoViewModel) {
     }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListScope.trackCarousel(vm: TunoViewModel, title: String, tracks: List<Track>, ctx: PlayContext) {
+/** A row of song cards. The first row on Home uses Spotify's bigger "Recommended for today" cards with a small label. */
+private fun androidx.compose.foundation.lazy.LazyListScope.trackCarousel(vm: TunoViewModel, title: String, tracks: List<Track>, ctx: PlayContext, big: Boolean = false) {
     if (tracks.isEmpty()) return
     item(key = "h-$title") { SectionTitle(title) }
     item(key = "r-$title") {
-        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(if (big) 16.dp else 14.dp)) {
             items(tracks.size, key = { tracks[it].id }) { i ->
                 val t = tracks[i]
-                CarouselCard(t.title, t.artist, 150.dp, { vm.player.play(tracks, i, ctx) }) { Art(vm.api.imageUrl(t.cover), it) }
+                CarouselCard(t.title, t.artist, if (big) 164.dp else 150.dp, { vm.player.play(tracks, i, ctx) }, kicker = if (big) "Song" else null) {
+                    Art(vm.api.imageUrl(t.cover), it)
+                }
             }
         }
     }

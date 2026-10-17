@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Clock3,
   Disc3,
+  EllipsisVertical,
   ExternalLink,
   Heart,
   ListEnd,
@@ -15,7 +16,7 @@ import {
   Trash2,
   UserRound,
 } from 'lucide-react';
-import { memo, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, type Track } from '../lib/api';
 import { useActions } from '../lib/actions';
@@ -25,6 +26,7 @@ import { useUI } from '../store/ui';
 import { Cover } from './Cover';
 import { Menu, useMenu, type MenuItem } from './Menu';
 import { Equalizer } from './Equalizer';
+import { LikeButton } from './PlayerBar';
 
 interface Props {
   tracks: Track[];
@@ -39,23 +41,30 @@ interface Props {
 export function TrackList({ tracks, context, playlistId, showAlbum = true, showAdded = true, reorderable, onReorder }: Props) {
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
+  const sentinel = useRef<HTMLDivElement>(null);
+  const pinned = usePinned(sentinel);
 
-  const cols = `grid-cols-[2rem_minmax(0,1fr)_2.5rem_3.5rem_2rem] ${
+  const cols = `grid-cols-[minmax(0,1fr)_2.5rem] md:grid-cols-[2rem_minmax(0,1fr)_2.5rem_3.5rem_2rem] ${
     showAlbum ? 'md:grid-cols-[2rem_minmax(0,4fr)_minmax(0,3fr)_2.5rem_3.5rem_2rem]' : ''
   } ${showAlbum && showAdded ? 'xl:grid-cols-[2rem_minmax(0,4fr)_minmax(0,3fr)_minmax(0,2fr)_2.5rem_3.5rem_2rem]' : ''}`;
 
   return (
     <div className="select-none" role="table">
-      <div className={`grid ${cols} items-center gap-3 border-b border-text/10 px-3 pb-2 text-sm text-muted`}>
-        <span className="text-center">#</span>
-        <span>Title</span>
-        {showAlbum && <span className="hidden md:block">Album</span>}
-        {showAlbum && showAdded && <span className="hidden xl:block">Date added</span>}
-        <span />
-        <Clock3 className="h-4 w-4 justify-self-end" />
-        <span />
+      <div ref={sentinel} className="h-px" />
+      <div
+        className={`sticky top-16 z-20 -mx-2 mb-2 px-2 transition-colors max-md:hidden md:-mx-4 md:px-4 ${pinned ? 'border-b border-text/10 bg-[#1a1a1a]' : ''}`}
+      >
+        <div className={`grid ${cols} h-9 items-center gap-3 border-b px-3 text-sm text-muted ${pinned ? 'border-transparent' : 'border-text/10'}`}>
+          <span className="text-center">#</span>
+          <span>Title</span>
+          {showAlbum && <span className="hidden md:block">Album</span>}
+          {showAlbum && showAdded && <span className="hidden xl:block">Date added</span>}
+          <span />
+          <Clock3 className="h-4 w-4 justify-self-end" />
+          <span />
+        </div>
       </div>
-      <div className="mt-2">
+      <div>
         {tracks.map((t, i) => (
           <div
             key={t.id}
@@ -116,18 +125,18 @@ const TrackRow = memo(function TrackRow({ track: t, index, tracks, context, play
       onDoubleClick={play}
       onContextMenu={menu.open}
       style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto var(--row-h)' }}
-      className={`group grid ${cols} h-row items-center gap-3 rounded px-3 text-sm transition-colors hover:bg-text/10 ${menu.isOpen ? 'bg-text/10' : ''}`}
+      className={`group grid ${cols} h-row items-center gap-3 rounded px-2 text-sm transition-colors hover:bg-text/10 md:px-3 ${menu.isOpen ? 'bg-text/10' : ''}`}
     >
-      <button onClick={play} className="flex items-center justify-center text-muted" aria-label={`Play ${t.title}`}>
+      <button onClick={play} className="hidden items-center justify-center text-base text-muted md:flex" aria-label={`Play ${t.title}`}>
         <span className={`tabular-nums group-hover:hidden ${isCurrent ? 'text-accent' : ''}`}>
           {isCurrent && playing ? <Equalizer /> : index + 1}
         </span>
         <Play className="hidden h-4 w-4 fill-current text-text group-hover:block" />
       </button>
-      <div className="flex min-w-0 items-center gap-3">
-        <Cover src={t.cover} className="h-10 w-10 shrink-0 shadow-none" />
+      <div className="flex min-w-0 items-center gap-3" onClick={() => window.matchMedia('(max-width: 767px)').matches && play()}>
+        <Cover src={t.cover} className="h-12 w-12 shrink-0 shadow-none md:h-10 md:w-10" />
         <div className="min-w-0">
-          <div className={`truncate font-medium ${isCurrent ? 'text-accent' : 'text-text'}`}>{t.title}</div>
+          <div className={`truncate text-base ${isCurrent ? 'text-accent' : 'text-text'}`}>{t.title}</div>
           <ArtistLink artist={t.artist} />
         </div>
       </div>
@@ -137,21 +146,35 @@ const TrackRow = memo(function TrackRow({ track: t, index, tracks, context, play
         </div>
       )}
       {showAlbum && showAdded && <div className="hidden truncate text-muted xl:block">{fmtAgo(t.addedAt)}</div>}
-      <button
-        onClick={() => actions.toggleLike(t)}
-        className={`icon-btn justify-self-center ${t.liked ? 'text-accent hover:text-accent' : 'opacity-0 group-hover:opacity-100 max-md:opacity-100'}`}
-        aria-label={t.liked ? 'Unlike' : 'Like'}
-      >
-        <Heart className={`h-4 w-4 ${t.liked ? 'fill-current' : ''}`} />
-      </button>
-      <span className="justify-self-end tabular-nums text-muted">{fmtTime(t.duration)}</span>
+      <span className="justify-self-center max-md:hidden">
+        <LikeButton liked={t.liked} reveal onClick={() => actions.toggleLike(t)} />
+      </span>
+      <span className="justify-self-end tabular-nums text-muted max-md:hidden">{fmtTime(t.duration)}</span>
       <button onClick={menu.open} className="icon-btn opacity-0 group-hover:opacity-100 max-md:opacity-100" aria-label="More options">
-        <MoreHorizontal className="h-5 w-5" />
+        <MoreHorizontal className="h-5 w-5 max-md:hidden" />
+        <EllipsisVertical className="h-5 w-5 md:hidden" />
       </button>
       {menu.isOpen && <TrackMenu track={t} playlistId={playlistId} menuProps={menu.props} />}
     </div>
   );
 });
+
+/** True once the element has scrolled up under the page's sticky bar, so the column headings can turn solid. */
+function usePinned(ref: React.RefObject<HTMLElement | null>) {
+  const [pinned, setPinned] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    const root = document.getElementById('main-view');
+    if (!el || !root) return;
+    const io = new IntersectionObserver(([e]) => setPinned(!e.isIntersecting && e.boundingClientRect.top < (e.rootBounds?.top ?? 0)), {
+      root,
+      rootMargin: '-64px 0px 0px 0px',
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref]);
+  return pinned;
+}
 
 function ArtistLink({ artist }: { artist: string }) {
   const navigate = useNavigate();

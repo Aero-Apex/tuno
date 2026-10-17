@@ -17,7 +17,8 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
-      '/api': { target: 'http://localhost:7070', changeOrigin: false },
+      // TUNO_API points the dev server at another backend, e.g. a local test server.
+      '/api': { target: process.env.TUNO_API ?? 'http://localhost:7070', changeOrigin: false },
     },
   },
 });

@@ -5,11 +5,15 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Cover } from '../components/Cover';
 import { Modal, readImage } from '../components/Dialogs';
 import { Menu, useMenu } from '../components/Menu';
-import { ActionBar, Empty, GradientHeader } from '../components/Page';
+import { Avatar } from '../components/Account';
+import { ActionBar, Empty, GradientHeader, PageBar } from '../components/Page';
 import { TrackList } from '../components/TrackList';
 import { api } from '../lib/api';
 import { useCoverColor } from '../lib/color';
 import { fmtLong, plural } from '../lib/format';
+import { useShallow } from 'zustand/react/shallow';
+import { useAuth } from '../store/auth';
+import { contextSlice, usePlayer } from '../store/player';
 import { useUI } from '../store/ui';
 import { FilterInput, PlayAllBar } from './Library';
 
@@ -24,6 +28,8 @@ export function PlaylistPage() {
   const { openImport, toast, ask } = useUI();
   const navigate = useNavigate();
   const tint = useCoverColor(p?.cover ?? p?.covers[0]);
+  const user = useAuth((s) => s.user);
+  const { context, playing, toggle, playTracks } = usePlayer(useShallow(contextSlice));
 
   if (isError) return <Empty icon={<ListMusic className="h-12 w-12" />} title="Playlist not found" />;
   if (!p) return <div className="h-96" />;
@@ -58,6 +64,11 @@ export function PlaylistPage() {
 
   return (
     <div className="animate-fade-in pb-10">
+      <PageBar
+        title={p.name}
+        playing={context === `playlist:${p.id}` && playing}
+        onPlay={() => (context === `playlist:${p.id}` ? toggle() : filtered.length && playTracks(filtered, 0, `playlist:${p.id}`))}
+      />
       <GradientHeader
         cover={p.cover}
         mosaic={p.covers}
@@ -66,9 +77,9 @@ export function PlaylistPage() {
         description={p.description}
         meta={
           <>
-            <span className="font-semibold">Tuno</span>
-            <span>· {plural(p.count, 'song')}</span>
-            {p.duration > 0 && <span>· {fmtLong(p.duration)}</span>}
+            {user && <Avatar name={user.name} className="mr-1 h-6 w-6 text-xs" />}
+            <span className="font-bold">{user?.name ?? 'Tuno'}</span>
+            <span className="text-text/70">• {plural(p.count, 'song')}{p.duration > 0 && `, ${fmtLong(p.duration)}`}</span>
           </>
         }
       />
@@ -89,19 +100,19 @@ export function PlaylistPage() {
             </>
           }
         />
-        <div className="ml-auto hidden sm:block">
-          <FilterInput value={q} onChange={setQ} />
+        <div className="ml-auto max-md:hidden">
+          <FilterInput value={q} onChange={setQ} placeholder="Search in playlist" />
         </div>
       </ActionBar>
 
       {p.pending > 0 && (
-        <Link to="/downloads" className="mx-4 mb-4 flex items-center gap-3 rounded-md bg-text/5 px-4 py-3 text-sm hover:bg-text/10 md:mx-6">
+        <Link to="/downloads" className="relative mx-4 mb-4 flex items-center gap-3 rounded-md bg-text/5 px-4 py-3 text-sm hover:bg-text/10 md:mx-6">
           <Loader2 className="h-4 w-4 animate-spin text-accent" />
           {plural(p.pending, 'song')} still downloading — they'll appear here as they finish.
         </Link>
       )}
 
-      <div className="px-2 md:px-4">
+      <div className="relative px-2 md:px-4">
         {p.tracks.length === 0 && !p.pending ? (
           <Empty
             icon={<ListMusic className="h-12 w-12" />}

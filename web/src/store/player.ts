@@ -115,7 +115,8 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   loading: false,
   error: null,
   time: saved?.time ?? 0,
-  duration: 0,
+  // Until the restored song is loaded, show its known length rather than 0:00.
+  duration: itemDuration(saved?.queue?.[saved?.index ?? 0]) ?? 0,
   buffered: 0,
   volume: saved?.volume ?? 0.8,
   muted: false,

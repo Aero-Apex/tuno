@@ -392,7 +392,7 @@ namespace TunoApp
         /// <summary>Dark title bar to match the app (Windows 10 20H1+; the caption colour needs Windows 11, older builds ignore both).</summary>
         public static void DarkTitleBar(IntPtr hwnd)
         {
-            int on = 1, caption = 0x121212, text = 0xFFFFFF;
+            int on = 1, caption = 0x000000, text = 0xFFFFFF; // black, like the app's top bar
             DwmSetWindowAttribute(hwnd, 20, ref on, 4);
             DwmSetWindowAttribute(hwnd, 19, ref on, 4);
             DwmSetWindowAttribute(hwnd, 35, ref caption, 4);
@@ -413,7 +413,7 @@ namespace TunoApp
         const int CmdChangeServer = 0x1010, CmdReload = 0x1020, CmdCheckUpdate = 0x1030, CmdAutoUpdate = 0x1040;
         // Autoplay: a music app starts the next song without a click. The rest keeps the profile small.
         const string BrowserArgs = "--autoplay-policy=no-user-gesture-required --disable-features=Translate,msEdgeShoppingUI,msEdgeFollow";
-        static readonly Color Back = Color.FromArgb(18, 18, 18);
+        static readonly Color Back = Color.Black;
 
         readonly WebView2 web = new WebView2();
         readonly string address;

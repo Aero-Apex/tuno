@@ -42,12 +42,13 @@ export default async function libraryRoutes(app: FastifyInstance) {
     const where: string[] = ['user_id = ?'];
     const params: unknown[] = [user.id];
     if (q.liked === '1') where.push('liked = 1');
+    // Same matching as /api/artists and /api/albums, which group names regardless of case.
     if (q.artist) {
-      where.push('artist = ?');
+      where.push('artist = ? COLLATE NOCASE');
       params.push(q.artist);
     }
     if (q.album) {
-      where.push('album = ?');
+      where.push('album = ? COLLATE NOCASE');
       params.push(q.album);
     }
     if (q.q) {
@@ -81,7 +82,8 @@ export default async function libraryRoutes(app: FastifyInstance) {
   app.get('/api/albums', async (req) => {
     const rows = db
       .prepare(
-        `SELECT album, artist, COUNT(*) AS count, MIN(id) AS coverTrack, MAX(added_at) AS addedAt
+        `SELECT album, artist, COUNT(*) AS count, COALESCE(MIN(CASE WHEN cover_path IS NOT NULL THEN id END), MIN(id)) AS coverTrack,
+                MAX(added_at) AS addedAt
          FROM tracks WHERE user_id = ? AND album IS NOT NULL AND album != ''
          GROUP BY album COLLATE NOCASE ORDER BY addedAt DESC`,
       )
@@ -92,7 +94,8 @@ export default async function libraryRoutes(app: FastifyInstance) {
   app.get('/api/artists', async (req) => {
     const rows = db
       .prepare(
-        `SELECT artist, COUNT(*) AS count, MAX(id) AS coverTrack FROM tracks WHERE user_id = ?
+        `SELECT artist, COUNT(*) AS count, COALESCE(MAX(CASE WHEN cover_path IS NOT NULL THEN id END), MAX(id)) AS coverTrack
+         FROM tracks WHERE user_id = ?
          GROUP BY artist COLLATE NOCASE ORDER BY artist COLLATE NOCASE`,
       )
       .all(currentUser(req).id) as { artist: string; count: number; coverTrack: number }[];

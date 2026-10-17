@@ -180,6 +180,8 @@ export default async function playlistRoutes(app: FastifyInstance) {
     const id = ownPlaylist(req, user.id).id;
     const { trackId } = req.params as { trackId: string };
     db.prepare('DELETE FROM playlist_tracks WHERE playlist_id = ? AND track_id = ?').run(id, Number(trackId));
+    // Like adding a song, removing one counts as a change for the "Recents" order.
+    db.prepare('UPDATE playlists SET updated_at = ? WHERE id = ?').run(Date.now(), id);
     emit(user.id, { type: 'playlists' });
     return { ok: true };
   });

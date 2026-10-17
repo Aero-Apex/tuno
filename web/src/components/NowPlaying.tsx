@@ -7,6 +7,7 @@ import { itemArtist, itemCover, itemTitle, usePlayer } from '../store/player';
 import { useTheme } from '../store/theme';
 import { useUI } from '../store/ui';
 import { Cover } from './Cover';
+import { useContextName } from '../lib/playContext';
 import { Controls, SaveButton, Seekbar, Volume } from './PlayerBar';
 import { QueueList } from './QueuePanel';
 import { Visualizer } from './Visualizer';
@@ -20,6 +21,8 @@ export function NowPlaying() {
   const [tab, setTab] = useState<'cover' | 'queue'>('cover');
   const navigate = useNavigate();
   const cover = itemCover(item);
+  const context = usePlayer((s) => s.context);
+  const ctx = useContextName();
 
   useEffect(() => {
     if (!nowPlayingOpen) return;
@@ -39,8 +42,9 @@ export function NowPlaying() {
         <button onClick={() => setNowPlaying(false)} className="icon-btn text-text" aria-label="Close">
           <ChevronDown className="h-7 w-7" />
         </button>
-        <div className="text-center text-xs font-semibold uppercase tracking-widest text-text/80">
-          {item?.preview ? `Streaming from ${SOURCE_LABEL[item.preview.source] ?? 'the web'}` : 'Now playing'}
+        <div className="min-w-0 px-2 text-center">
+          <div className="text-[11px] uppercase tracking-widest text-text/80">{item?.preview ? 'Streaming from' : context ? 'Playing from' : 'Now playing'}</div>
+          <div className="truncate text-sm font-bold">{item?.preview ? SOURCE_LABEL[item.preview.source] ?? 'the web' : context ? ctx.name : ''}</div>
         </div>
         <button onClick={() => setTab(tab === 'cover' ? 'queue' : 'cover')} className={`icon-btn ${tab === 'queue' ? 'text-accent' : 'text-text'}`} aria-label="Queue">
           <ListMusic className="h-6 w-6" />

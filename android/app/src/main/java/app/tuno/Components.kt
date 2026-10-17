@@ -361,18 +361,31 @@ fun PillButton(
 
 /** Square card used in the Home carousels (cover + two lines of text). */
 @Composable
-fun CarouselCard(title: String, subtitle: String, width: Dp, onClick: () -> Unit, circle: Boolean = false, image: @Composable (Modifier) -> Unit) {
+fun CarouselCard(
+    title: String,
+    subtitle: String,
+    width: Dp,
+    onClick: () -> Unit,
+    circle: Boolean = false,
+    kicker: String? = null,
+    image: @Composable (Modifier) -> Unit,
+) {
     Column(
         Modifier.width(width).clip(RoundedCornerShape(6.dp)).clickable(onClick = onClick),
         horizontalAlignment = if (circle) Alignment.CenterHorizontally else Alignment.Start,
     ) {
         image(Modifier.fillMaxWidth().aspectRatio(1f))
+        if (kicker != null) Text(kicker, style = T.Small.copy(fontSize = 13.sp), maxLines = 1, modifier = Modifier.padding(top = 8.dp))
         Text(
             title,
-            style = TextStyle(fontSize = 13.sp, fontWeight = if (circle) FontWeight.SemiBold else FontWeight.Normal, color = S.Text),
+            style = TextStyle(
+                fontSize = if (kicker != null) 14.sp else 13.sp,
+                fontWeight = if (circle || kicker != null) FontWeight.SemiBold else FontWeight.Normal,
+                color = S.Text,
+            ),
             maxLines = if (circle) 1 else 2,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(top = if (kicker != null) 2.dp else 8.dp),
         )
         if (subtitle.isNotEmpty()) Text(subtitle, style = T.Small, maxLines = if (circle) 1 else 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
     }

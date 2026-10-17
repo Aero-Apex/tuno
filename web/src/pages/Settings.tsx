@@ -276,7 +276,7 @@ function Appearance() {
           />
         </Row>
         <Row label="Sidebar width">
-          <Slider value={theme.sidebarWidth} min={220} max={400} step={10} unit="px" onChange={(v) => set({ sidebarWidth: v })} />
+          <Slider value={theme.sidebarWidth} min={220} max={480} step={10} unit="px" onChange={(v) => set({ sidebarWidth: v })} />
         </Row>
         <Row label="Player style">
           <Segmented

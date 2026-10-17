@@ -101,6 +101,17 @@ export function isSingleVideoUrl(url: string): boolean {
   }
 }
 
+/**
+ * Where a link's songs go in a playlist. The playlist made from that link (or re-synced from it) keeps the source's
+ * order; any other playlist gets them after the songs it already has, instead of mixed in among them.
+ */
+function positionBase(playlistId: number | null, url: string): number {
+  if (!playlistId) return 0;
+  const p = db.prepare('SELECT source_url FROM playlists WHERE id = ?').get(playlistId) as { source_url: string | null } | undefined;
+  if (!p || p.source_url === url) return 0;
+  return (db.prepare('SELECT MAX(position) AS m FROM playlist_tracks WHERE playlist_id = ?').get(playlistId) as { m: number | null }).m ?? 0;
+}
+
 /** Turns any supported link into download jobs (and a playlist when the link is a collection). */
 export async function importUrl(userId: number, url: string, opts: { playlistId?: number } = {}): Promise<ImportResult> {
   url = url.trim();
@@ -124,6 +135,7 @@ export async function importUrl(userId: number, url: string, opts: { playlistId?
         .all(playlistId) as { artist: string; title: string }[])
         existingQueries.add(`${t.artist} - ${t.title}`.toLowerCase());
     }
+    const base = positionBase(playlistId, url);
     const jobs: NewJob[] = col.tracks
       .map((t, i) => ({
         query: `${t.artist} - ${t.title}`,
@@ -134,7 +146,7 @@ export async function importUrl(userId: number, url: string, opts: { playlistId?
         thumbnail: t.cover ?? (col.kind === 'album' || col.kind === 'track' ? col.cover ?? null : null),
         duration_hint: t.durationSec ?? null,
         playlist_id: playlistId,
-        position: i + 1,
+        position: base + i + 1,
         source: 'spotify',
       }))
       .filter((j) => !existingQueries.has(j.query.toLowerCase()));
@@ -173,12 +185,13 @@ export async function importUrl(userId: number, url: string, opts: { playlistId?
     );
     let existing = 0;
     const jobs: NewJob[] = [];
+    const base = positionBase(playlistId, url);
     entries.forEach((e, i) => {
       const source = sourceKey(e.ie_key);
       const owned = e.id ? findTrack(userId, source, e.id) : undefined;
       if (owned) {
         existing++;
-        if (!inPlaylist.has(owned.id)) addToPlaylist(playlistId, owned.id, i + 1);
+        if (!inPlaylist.has(owned.id)) addToPlaylist(playlistId, owned.id, base + i + 1);
         return;
       }
       const entryUrl = e.webpage_url ?? e.url!;
@@ -193,7 +206,7 @@ export async function importUrl(userId: number, url: string, opts: { playlistId?
         album: isAlbum ? name : null,
         thumbnail: bestThumb(e.thumbnails) ?? null,
         playlist_id: playlistId,
-        position: i + 1,
+        position: base + i + 1,
       });
     });
     enqueue(userId, jobs);

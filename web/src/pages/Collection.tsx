@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ActionBar, GradientHeader } from '../components/Page';
+import { useShallow } from 'zustand/react/shallow';
+import { ActionBar, GradientHeader, PageBar } from '../components/Page';
+import { contextSlice, usePlayer } from '../store/player';
 import { TrackList } from '../components/TrackList';
 import { api } from '../lib/api';
 import { useCoverColor } from '../lib/color';
@@ -20,9 +22,11 @@ function CollectionPage({ kind }: { kind: 'album' | 'artist' }) {
   const filtered = q ? tracks.filter((t) => `${t.title} ${t.album ?? ''}`.toLowerCase().includes(q.toLowerCase())) : tracks;
   const ctx = `${kind}:${name}`;
   const artists = [...new Set(tracks.map((t) => t.artist))];
+  const { context, playing, toggle, playTracks } = usePlayer(useShallow(contextSlice));
 
   return (
     <div className="animate-fade-in pb-10">
+      <PageBar title={name} playing={context === ctx && playing} onPlay={() => (context === ctx ? toggle() : filtered.length && playTracks(filtered, 0, ctx))} />
       <GradientHeader
         cover={cover}
         round={kind === 'artist'}
@@ -30,19 +34,20 @@ function CollectionPage({ kind }: { kind: 'album' | 'artist' }) {
         title={name}
         meta={
           <>
-            {kind === 'album' && artists.length > 0 && <span className="font-semibold">{artists.slice(0, 3).join(', ')} ·</span>}
-            <span>{plural(tracks.length, 'song')}</span>
-            <span>· {fmtLong(tracks.reduce((a, t) => a + (t.duration ?? 0), 0))}</span>
+            {kind === 'album' && artists.length > 0 && <span className="font-bold">{artists.slice(0, 3).join(', ')} •</span>}
+            <span className="text-text/70">
+              {plural(tracks.length, 'song')}, {fmtLong(tracks.reduce((a, t) => a + (t.duration ?? 0), 0))}
+            </span>
           </>
         }
       />
       <ActionBar tint={tint}>
         <PlayAllBar tracks={filtered} context={ctx} />
-        <div className="ml-auto hidden sm:block">
-          <FilterInput value={q} onChange={setQ} />
+        <div className="ml-auto max-md:hidden">
+          <FilterInput value={q} onChange={setQ} placeholder={kind === 'album' ? 'Search in album' : 'Search in songs'} />
         </div>
       </ActionBar>
-      <div className="px-2 md:px-4">
+      <div className="relative px-2 md:px-4">
         <TrackList tracks={filtered} context={ctx} showAlbum={kind === 'artist'} showAdded={false} />
       </div>
     </div>

@@ -109,11 +109,12 @@ select optgroup {
   .input {
     @apply w-full rounded bg-text/10 px-3 py-2 text-sm text-text outline-none ring-0 placeholder:text-muted/80 focus:bg-text/15 focus:ring-2 focus:ring-text/30;
   }
+  /* Filter pills: grey, and white when picked (green on phones, as in the mobile app). */
   .chip {
-    @apply rounded-full bg-text/10 px-3 py-1.5 text-sm font-medium text-text transition-colors hover:bg-text/15;
+    @apply inline-flex h-8 items-center rounded-full bg-text/[0.07] px-3 text-sm text-text transition-colors hover:bg-text/[0.1] max-md:bg-[#2a2a2a];
   }
   .chip-active {
-    @apply rounded-full bg-text px-3 py-1.5 text-sm font-medium text-bg;
+    @apply inline-flex h-8 items-center rounded-full bg-text px-3 text-sm text-bg hover:brightness-95 max-md:bg-accent max-md:text-on-accent;
   }
   .card {
     @apply rounded-md p-3 transition-colors hover:bg-text/[0.07];

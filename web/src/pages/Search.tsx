@@ -5,7 +5,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Cover } from '../components/Cover';
 import { Equalizer } from '../components/Equalizer';
 import { Menu, useMenu } from '../components/Menu';
-import { Card, Empty, Page, Shelf, shelfItem } from '../components/Page';
+import { Card, Empty, Page, PageBar, Shelf, shelfItem } from '../components/Page';
+import { SearchBox } from '../components/TopBar';
 import { api, type SearchResult, type SearchSource } from '../lib/api';
 import { useActions } from '../lib/actions';
 import { fmtTime, SOURCE_COLOR, SOURCE_LABEL } from '../lib/format';
@@ -68,17 +69,17 @@ export function SearchPage() {
 
   if (!q) {
     return (
-      <Page>
-        <h1 className="mb-6 text-3xl font-extrabold tracking-tight">Search</h1>
-        <p className="mb-8 max-w-xl text-muted">
-          Search YouTube Music, YouTube, SoundCloud and your own library at once — or paste any link in the search bar to download it.
-        </p>
+      <Page bar={<PageBar avatar back={false} solid />}>
+        <h1 className="mb-4 text-2xl font-bold tracking-tight md:hidden">Search</h1>
+        <div className="mb-6 md:hidden">
+          <SearchBox variant="page" />
+        </div>
         {recent.length > 0 && (
-          <>
-            <h2 className="mb-3 text-xl font-bold">Recent searches</h2>
+          <section className="mb-8">
+            <h2 className="mb-3 text-2xl font-bold tracking-tight">Recent searches</h2>
             <div className="flex flex-wrap gap-2">
               {recent.map((r) => (
-                <span key={r} className="chip flex items-center gap-1.5 pr-1.5">
+                <span key={r} className="chip gap-1.5 pr-1.5">
                   <button onClick={() => navigate(`/search?q=${encodeURIComponent(r)}`)}>{r}</button>
                   <button onClick={() => remove(r)} className="rounded-full p-0.5 text-muted hover:text-text" aria-label={`Remove ${r}`}>
                     <X className="h-3.5 w-3.5" />
@@ -86,25 +87,19 @@ export function SearchPage() {
                 </span>
               ))}
             </div>
-          </>
+          </section>
         )}
-        <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-4">
-          {(['ytmusic', 'youtube', 'soundcloud', 'spotify'] as const).map((s) => (
-            <div key={s} className="relative h-28 overflow-hidden rounded-lg p-4 font-bold" style={{ background: SOURCE_COLOR[s] }}>
-              <span className="text-xl text-white drop-shadow">{SOURCE_LABEL[s]}</span>
-              <span className="absolute bottom-3 left-4 text-xs font-medium text-white/80">
-                {s === 'spotify' ? 'Paste links — matched on YT Music' : 'Search & paste links'}
-              </span>
-            </div>
-          ))}
-        </div>
+        <BrowseAll />
       </Page>
     );
   }
 
   return (
-    <Page>
-      <div className="no-scrollbar -mx-1 mb-6 flex gap-2 overflow-x-auto px-1">
+    <Page bar={<PageBar back={false} solid />}>
+      <div className="mb-4 md:hidden">
+        <SearchBox variant="page" />
+      </div>
+      <div className="no-scrollbar -mx-4 mb-6 flex gap-2 overflow-x-auto px-4 md:mx-0 md:px-0">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -120,6 +115,65 @@ export function SearchPage() {
   );
 }
 
+/** Colors for the Browse cards, in the spirit of Spotify's category tiles. */
+const BROWSE_COLORS = ['#dc148c', '#006450', '#8400e7', '#1e3264', '#e8115b', '#477d95', '#e91429', '#503750', '#b06239', '#0d73ec', '#148a08', '#7358ff'];
+
+function BrowseCard({ title, color, image, onClick, round }: { title: string; color: string; image?: string | null; onClick: () => void; round?: boolean }) {
+  return (
+    <button onClick={onClick} className="relative aspect-[16/9] overflow-hidden rounded-lg p-3 text-left md:aspect-square md:p-4" style={{ background: color }}>
+      <span className="relative z-10 line-clamp-2 break-words text-base font-bold text-white md:text-2xl md:tracking-tight">{title}</span>
+      {image && (
+        <Cover src={image} round={round} className="absolute -bottom-1 -right-3 h-[52%] w-auto rotate-[25deg] shadow-[0_2px_4px_rgb(0_0_0/0.2)] md:h-[45%]" />
+      )}
+    </button>
+  );
+}
+
+/** The search page before you type: shortcuts into your library and its artists and albums, as colored tiles. */
+function BrowseAll() {
+  const navigate = useNavigate();
+  const { data: artists = [] } = useQuery({ queryKey: ['artists'], queryFn: api.artists, staleTime: 60_000 });
+  const { data: albums = [] } = useQuery({ queryKey: ['albums'], queryFn: api.albums, staleTime: 60_000 });
+  const { data: home } = useQuery({ queryKey: ['home'], queryFn: api.home });
+  const cover = (i: number) => home?.recentlyAdded?.[i]?.cover ?? artists[i]?.cover ?? null;
+  const focus = () => window.dispatchEvent(new Event('tuno:focus-search'));
+  const fixed = [
+    { title: 'Liked Songs', onClick: () => navigate('/liked'), image: cover(0) },
+    { title: 'Your Library', onClick: () => navigate('/library'), image: cover(1) },
+    { title: 'Downloads', onClick: () => navigate('/downloads'), image: cover(2) },
+    { title: 'YT Music', onClick: focus, image: cover(3) },
+    { title: 'YouTube', onClick: focus, image: cover(4) },
+    { title: 'SoundCloud', onClick: focus, image: cover(5) },
+  ];
+  const top = [...artists].sort((a, b) => b.count - a.count).slice(0, 12);
+  const topAlbums = [...albums].sort((a, b) => b.count - a.count).slice(0, 6);
+  const color = (i: number) => BROWSE_COLORS[i % BROWSE_COLORS.length];
+  return (
+    <section>
+      <h2 className="mb-4 text-base font-bold md:text-2xl md:tracking-tight">Browse all</h2>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+        {fixed.map((c, i) => (
+          <BrowseCard key={c.title} title={c.title} color={color(i)} image={c.image} onClick={c.onClick} />
+        ))}
+        {top.map((a, i) => (
+          <BrowseCard key={'a' + a.artist} title={a.artist} round color={color(i + fixed.length)} image={a.cover} onClick={() => navigate(`/artist/${encodeURIComponent(a.artist)}`)} />
+        ))}
+        {topAlbums.map((a, i) => (
+          <BrowseCard
+            key={'l' + a.album}
+            title={a.album}
+            color={color(i + fixed.length + top.length)}
+            image={a.cover}
+            onClick={() => navigate(`/album/${encodeURIComponent(a.album)}`)}
+          />
+        ))}
+      </div>
+      <p className="mt-8 max-w-xl text-sm text-muted">
+        Search YouTube Music, YouTube, SoundCloud and your own library at once, or paste any link (Spotify too) in the search bar to download it.
+      </p>
+    </section>
+  );
+}
 function AllResults({ q }: { q: string }) {
   const ytm = useSource(q, 'ytmusic');
   const lib = useSource(q, 'library');
@@ -220,7 +274,7 @@ function SourceResults({ q, source }: { q: string; source: SearchSource }) {
 function TopResult({ r }: { r: SearchResult }) {
   const play = usePlay();
   return (
-    <div className="group relative rounded-lg bg-text/5 p-5 transition-colors hover:bg-text/10">
+    <div className="group relative rounded-lg bg-[#181818] p-5 transition-colors hover:bg-[#282828]">
       <Cover src={r.thumbnail} className="mb-5 h-24 w-24 shadow-xl" />
       <div className="truncate text-3xl font-extrabold tracking-tight">{r.title}</div>
       <div className="mt-1 flex items-center gap-2 text-sm text-muted">

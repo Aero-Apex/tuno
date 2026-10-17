@@ -1,16 +1,15 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { ConfirmDialog, EditTrackDialog, ImportDialog, Toasts } from './components/Dialogs';
 import { MobileNav } from './components/MobileNav';
 import { NowPlaying } from './components/NowPlaying';
+import { RightPanel } from './components/NowPlayingView';
 import { PlayerBar } from './components/PlayerBar';
-import { QueuePanel } from './components/QueuePanel';
-import { Sidebar } from './components/Sidebar';
+import { LibraryResizer, Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { useActions } from './lib/actions';
 import { useServerEvents } from './lib/events';
 import { isUrl } from './lib/format';
-import { headerTint } from './lib/tint';
 import { HomePage } from './pages/Home';
 import { usePlayer } from './store/player';
 import { useTheme } from './store/theme';
@@ -95,36 +94,40 @@ function useKeyboardShortcuts() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
+/** The Now Playing view or queue on the right, with the same gap as between the other panels. */
+function RightPanelSlot() {
+  const panel = useUI((s) => s.rightPanel);
+  const hasItem = usePlayer((s) => s.queue.length > 0);
+  if (!(panel === 'queue' || (panel === 'nowplaying' && hasItem))) return null;
+  return (
+    <>
+      <div className="w-2 shrink-0 max-lg:hidden" />
+      <RightPanel />
+    </>
+  );
+}
+
 export default function App() {
   useServerEvents();
   useKeyboardShortcuts();
   const loadTheme = useTheme((s) => s.loadFromServer);
   const theme = useTheme((s) => s.theme);
-  const queueOpen = useUI((s) => s.queueOpen);
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
-  const [scrolled, setScrolled] = useState(false);
-  const [tint, setTint] = useState<string | null>(null);
 
   useEffect(() => {
     loadTheme();
   }, [loadTheme]);
 
   useEffect(() => {
-    const l = () => setTint(headerTint.current);
-    headerTint.listeners.add(l);
-    return () => void headerTint.listeners.delete(l);
-  }, []);
-
-  useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
-    setScrolled(false);
   }, [location.pathname]);
 
   const floating = theme.player === 'floating';
+  const right = theme.sidebar === 'right';
 
   return (
-    <div className="relative flex h-full flex-col">
+    <div className="relative flex h-full flex-col bg-surface">
       {theme.bgImage && (
         <div className="pointer-events-none fixed inset-0 -z-0" aria-hidden>
           <img src={theme.bgImage} alt="" className="h-full w-full scale-110 object-cover" style={{ filter: `blur(${theme.bgBlur}px)` }} />
@@ -132,18 +135,22 @@ export default function App() {
         </div>
       )}
 
-      <div className={`relative flex min-h-0 flex-1 gap-2 p-0 md:p-2 ${theme.sidebar === 'right' ? 'flex-row-reverse' : ''}`}>
+      <div className="relative z-10">
+        <TopBar />
+      </div>
+      <div className={`relative flex min-h-0 flex-1 md:px-2 ${right ? 'flex-row-reverse' : ''}`}>
         <div className="hidden md:block">
           <Sidebar />
         </div>
+        <div className="hidden md:block">
+          <LibraryResizer />
+        </div>
         <main
+          id="main-view"
           ref={mainRef}
-          onScroll={(e) => setScrolled((e.target as HTMLElement).scrollTop > 40)}
-          className="panel relative min-w-0 flex-1 overflow-y-auto overflow-x-hidden max-md:rounded-none"
+          className="panel relative min-w-0 flex-1 overflow-y-auto overflow-x-hidden max-md:rounded-none max-md:bg-bg"
         >
-          <TopBar scrolled={scrolled} tint={tint} />
-          <div className="relative -mt-[68px]">
-            <Suspense fallback={<div className="h-screen" />}>
+          <Suspense fallback={<div className="h-screen" />}>
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/search" element={<SearchPage />} />
@@ -156,17 +163,21 @@ export default function App() {
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<HomePage />} />
             </Routes>
-            </Suspense>
-          </div>
+          </Suspense>
+          {/* Room for the floating mini player and tab bar on phones. */}
+          <div className="h-[calc(136px+env(safe-area-inset-bottom))] md:hidden" />
         </main>
-        {queueOpen && <QueuePanel />}
+        <RightPanelSlot />
       </div>
 
-      <div className={`relative z-40 ${floating ? 'md:mx-4 md:mb-4 md:rounded-xl md:bg-elevated/95 md:shadow-2xl md:backdrop-blur' : 'md:bg-surface'}`}>
-        <PlayerBar />
-      </div>
-      <div className="relative z-40">
-        <MobileNav />
+      {/* On phones the mini player and tab bar float over the page with a fade to black behind them. */}
+      <div className="max-md:pointer-events-none max-md:absolute max-md:inset-x-0 max-md:bottom-0 max-md:z-40 max-md:bg-[linear-gradient(transparent_0,rgb(0_0_0/0.8)_30%,rgb(0_0_0/0.96)_55%,#000_100%)] max-md:pt-6">
+        <div className={`relative z-40 max-md:pointer-events-auto ${floating ? 'md:mx-4 md:mb-4 md:rounded-xl md:bg-elevated/95 md:shadow-2xl md:backdrop-blur' : 'md:bg-surface'}`}>
+          <PlayerBar />
+        </div>
+        <div className="relative z-40 max-md:pointer-events-auto">
+          <MobileNav />
+        </div>
       </div>
 
       <NowPlaying />
