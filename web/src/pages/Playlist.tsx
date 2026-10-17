@@ -67,7 +67,7 @@ export function PlaylistPage() {
       <PageBar
         title={p.name}
         playing={context === `playlist:${p.id}` && playing}
-        onPlay={() => (context === `playlist:${p.id}` ? toggle() : filtered.length && playTracks(filtered, 0, `playlist:${p.id}`))}
+        onPlay={() => (context === `playlist:${p.id}` ? toggle() : p.tracks.length && playTracks(p.tracks, 0, `playlist:${p.id}`))}
       />
       <GradientHeader
         cover={p.cover}
@@ -85,7 +85,7 @@ export function PlaylistPage() {
       />
       <ActionBar tint={tint}>
         <PlayAllBar
-          tracks={filtered}
+          tracks={p.tracks}
           context={`playlist:${p.id}`}
           extra={
             <>
@@ -127,6 +127,7 @@ export function PlaylistPage() {
         ) : (
           <TrackList
             tracks={filtered}
+            queueSource={p.tracks}
             context={`playlist:${p.id}`}
             playlistId={p.id}
             reorderable={!q}

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Crown, KeyRound, LogOut, Pencil, Plus, Trash2, UserRound } from 'lucide-react';
+import { Crown, KeyRound, LogOut, MessageCircle, Pencil, Plus, Trash2, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { Modal } from '../components/Dialogs';
 import { api, type AdminUser } from '../lib/api';
@@ -7,6 +7,7 @@ import { fmtAgo, fmtBytes, plural } from '../lib/format';
 import { useAuth } from '../store/auth';
 import { useUI } from '../store/ui';
 
+const DISCORD_INVITE = 'https://discord.gg/cwPg8mhSWX';
 const GB = 1024 ** 3;
 const gb = (bytes: number) => +(bytes / GB).toFixed(bytes < GB ? 2 : 1);
 
@@ -57,6 +58,14 @@ export function Account() {
         <h2 className="mb-3 text-xl font-bold">Storage</h2>
         <QuotaBar used={data?.used ?? 0} quota={user.quotaBytes} />
         <p className="mt-2 text-sm text-muted">When it's full, new downloads stop. Free up space in the Storage tab.</p>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-xl font-bold">Community</h2>
+        <a href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer" className="btn-ghost">
+          <MessageCircle className="h-4 w-4" /> Join the Tuno Discord
+        </a>
+        <p className="mt-2 text-sm text-muted">Release news, help and bug reports.</p>
       </section>
 
       <button onClick={() => logout()} className="btn-ghost">

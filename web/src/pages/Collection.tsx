@@ -26,7 +26,7 @@ function CollectionPage({ kind }: { kind: 'album' | 'artist' }) {
 
   return (
     <div className="animate-fade-in pb-10">
-      <PageBar title={name} playing={context === ctx && playing} onPlay={() => (context === ctx ? toggle() : filtered.length && playTracks(filtered, 0, ctx))} />
+      <PageBar title={name} playing={context === ctx && playing} onPlay={() => (context === ctx ? toggle() : tracks.length && playTracks(tracks, 0, ctx))} />
       <GradientHeader
         cover={cover}
         round={kind === 'artist'}
@@ -42,13 +42,13 @@ function CollectionPage({ kind }: { kind: 'album' | 'artist' }) {
         }
       />
       <ActionBar tint={tint}>
-        <PlayAllBar tracks={filtered} context={ctx} />
+        <PlayAllBar tracks={tracks} context={ctx} />
         <div className="ml-auto max-md:hidden">
           <FilterInput value={q} onChange={setQ} placeholder={kind === 'album' ? 'Search in album' : 'Search in songs'} />
         </div>
       </ActionBar>
       <div className="relative px-2 md:px-4">
-        <TrackList tracks={filtered} context={ctx} showAlbum={kind === 'artist'} showAdded={false} />
+        <TrackList tracks={filtered} queueSource={tracks} context={ctx} showAlbum={kind === 'artist'} showAdded={false} />
       </div>
     </div>
   );

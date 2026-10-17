@@ -195,7 +195,7 @@ export function LibraryPage() {
         ) : (
           <>
             <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-              <PlayAllBar tracks={filtered} context="library" />
+              <PlayAllBar tracks={tracks.data ?? []} context="library" />
               <div className="flex items-center gap-2">
                 <FilterInput value={q} onChange={setQ} placeholder="Search in songs" />
                 <select
@@ -228,7 +228,7 @@ export function LibraryPage() {
               </Link>
             </div>
             <div className="-mx-2 md:mx-0">
-              <TrackList tracks={filtered} context="library" />
+              <TrackList tracks={filtered} queueSource={tracks.data} context="library" />
             </div>
           </>
         ))}
@@ -359,7 +359,7 @@ export function LikedPage() {
       <PageBar
         title="Liked Songs"
         playing={context === 'liked' && playing}
-        onPlay={() => (context === 'liked' ? toggle() : filtered.length && playTracks(filtered, 0, 'liked'))}
+        onPlay={() => (context === 'liked' ? toggle() : tracks.length && playTracks(tracks, 0, 'liked'))}
       />
       <GradientHeader
         kicker="Playlist"
@@ -375,7 +375,7 @@ export function LikedPage() {
         }
       />
       <ActionBar tint="#5038a0">
-        <PlayAllBar tracks={filtered} context="liked" />
+        <PlayAllBar tracks={tracks} context="liked" />
         <div className="ml-auto max-md:hidden">
           <FilterInput value={q} onChange={setQ} placeholder="Search in Liked Songs" />
         </div>
@@ -384,7 +384,7 @@ export function LikedPage() {
         {tracks.length === 0 ? (
           <Empty icon={<Heart className="h-12 w-12" />} title="Songs you like will appear here" body="Save songs by tapping the plus icon." />
         ) : (
-          <TrackList tracks={filtered} context="liked" />
+          <TrackList tracks={filtered} queueSource={tracks} context="liked" />
         )}
       </div>
     </div>

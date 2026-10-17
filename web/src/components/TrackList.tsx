@@ -30,6 +30,8 @@ import { LikeButton } from './PlayerBar';
 
 interface Props {
   tracks: Track[];
+  /** The whole list when `tracks` is a filtered view of it, so playing a row keeps the rest of the list queued. */
+  queueSource?: Track[];
   context: string;
   playlistId?: number;
   showAlbum?: boolean;
@@ -38,7 +40,7 @@ interface Props {
   onReorder?: (ids: number[]) => void;
 }
 
-export function TrackList({ tracks, context, playlistId, showAlbum = true, showAdded = true, reorderable, onReorder }: Props) {
+export function TrackList({ tracks, queueSource, context, playlistId, showAlbum = true, showAdded = true, reorderable, onReorder }: Props) {
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
@@ -88,7 +90,7 @@ export function TrackList({ tracks, context, playlistId, showAlbum = true, showA
             }}
             className={dragOver === i && dragFrom !== null ? 'border-t-2 border-accent' : 'border-t-2 border-transparent'}
           >
-            <TrackRow track={t} index={i} tracks={tracks} context={context} playlistId={playlistId} cols={cols} showAlbum={showAlbum} showAdded={showAdded} />
+            <TrackRow track={t} index={i} tracks={queueSource ?? tracks} context={context} playlistId={playlistId} cols={cols} showAlbum={showAlbum} showAdded={showAdded} />
           </div>
         ))}
       </div>
@@ -116,7 +118,8 @@ const TrackRow = memo(function TrackRow({ track: t, index, tracks, context, play
   const play = () => {
     const p = usePlayer.getState();
     if (isCurrent) return p.toggle();
-    p.playTracks(tracks, index, context);
+    // `tracks` is the whole list here, so start at this song's place in it.
+    p.playTracks(tracks, Math.max(0, tracks.findIndex((x) => x.id === t.id)), context);
   };
 
   return (
