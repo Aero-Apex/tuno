@@ -348,6 +348,8 @@ class TunoViewModel(app: Application) : AndroidViewModel(app) {
             refreshLibrary()
             refreshJobs()
         }
+        // The progress poller stops in the background; pick it up again if something is still downloading.
+        if (session == Session.SignedIn && activeJobs() > 0) pollJobs()
         if (session == Session.SignedIn) {
             updates.onResumed(getApplication())
             updates.checkIfDue()
@@ -374,9 +376,10 @@ class TunoViewModel(app: Application) : AndroidViewModel(app) {
     private fun pollJobs() {
         if (poller?.isActive == true) return
         poller = viewModelScope.launch {
-            while (true) {
+            // Stops when the app leaves the screen (onResume starts it again) or nothing is downloading any more.
+            while (foreground) {
                 delay(3000)
-                if (!foreground) continue
+                if (!foreground) break
                 val before = jobs.count { it.status == "done" }
                 jobs = runCatching { api.jobs() }.getOrNull() ?: continue
                 if (jobs.count { it.status == "done" } != before) refreshLibrary()

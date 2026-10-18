@@ -46,15 +46,15 @@ export function Visualizer({ className = '', bars = 12 }: { className?: string; 
     const g = c.getContext('2d')!;
     const data = new Uint8Array(a.frequencyBinCount);
     let raf = 0;
-    // Reading computed styles every frame is slow; refresh the accent color twice a second.
+    let last = 0;
+    let onScreen = true;
+    // The accent color is read when playback starts, not every frame: reading computed styles is slow.
     let color = '';
     const readColor = () => (color = getComputedStyle(document.documentElement).getPropertyValue('--c-accent').trim().split(' ').join(','));
-    readColor();
-    const colorTimer = setInterval(readColor, 500);
-    let last = 0;
+    // Animate only while the bar is on screen, the tab is visible and music is playing; otherwise the loop stops.
+    const wanted = () => onScreen && !audio.paused && !document.hidden;
     const draw = (now = 0) => {
-      // Nothing to animate while paused: stop the loop completely (it restarts on 'play').
-      if (audio.paused) {
+      if (!wanted()) {
         raf = 0;
         g.clearRect(0, 0, c.width, c.height);
         return;
@@ -83,14 +83,24 @@ export function Visualizer({ className = '', bars = 12 }: { className?: string; 
       }
     };
     const start = () => {
-      if (!raf) raf = requestAnimationFrame(draw);
+      if (!raf && wanted()) {
+        readColor();
+        raf = requestAnimationFrame(draw);
+      }
     };
+    const watch = new IntersectionObserver(([entry]) => {
+      onScreen = entry.isIntersecting;
+      start();
+    });
+    watch.observe(c);
     audio.addEventListener('play', start);
+    document.addEventListener('visibilitychange', start);
     start();
     return () => {
+      watch.disconnect();
       audio.removeEventListener('play', start);
+      document.removeEventListener('visibilitychange', start);
       cancelAnimationFrame(raf);
-      clearInterval(colorTimer);
     };
   }, [bars]);
 

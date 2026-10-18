@@ -67,7 +67,10 @@ function WindowsUpdates({ version, bridge }: { version: string; bridge: ShellBri
     bridge.addEventListener('message', onMessage);
     const ask = () => bridge.postMessage({ type: 'get-status' });
     ask();
-    const timer = setInterval(ask, 4000);
+    // Keep the numbers fresh while the window is on screen; a hidden window doesn't need the chatter.
+    const timer = setInterval(() => {
+      if (!document.hidden) ask();
+    }, 5000);
     return () => {
       clearInterval(timer);
       bridge.removeEventListener('message', onMessage);

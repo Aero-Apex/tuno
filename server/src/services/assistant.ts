@@ -300,8 +300,13 @@ function takePending(userId: number, id: string): Pending {
 
 export async function approveAction(userId: number, id: string) {
   const p = takePending(userId, id);
-  const result = await executeAction(userId, p.name, p.args);
-  return { ok: true, description: p.description, result };
+  try {
+    const result = await executeAction(userId, p.name, p.args);
+    return { ok: true, description: p.description, result };
+  } catch (err) {
+    // The change was refused (a playlist that's gone, a link that won't download): say why, as a client error.
+    throw new HttpError(400, (err as Error).message);
+  }
 }
 
 export function rejectAction(userId: number, id: string) {

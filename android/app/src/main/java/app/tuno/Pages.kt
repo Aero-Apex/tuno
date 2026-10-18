@@ -211,12 +211,12 @@ private fun jobSource(j: Job): String {
 @Composable
 fun DownloadsScreen(vm: TunoViewModel) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    // Checks the server only while this page is on screen: often while something downloads, rarely otherwise.
+    // While something downloads, the view model's progress poller keeps this list current; here we only look now and then.
     LaunchedEffect(Unit) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
                 vm.refreshJobs()
-                delay(if (vm.activeJobs() > 0) 2500 else 15_000)
+                delay(15_000)
             }
         }
     }

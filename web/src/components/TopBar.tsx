@@ -145,7 +145,7 @@ export function TopBar() {
       <div className="flex flex-1 items-center justify-end gap-1">
         <button
           onClick={() => navigate('/assistant')}
-          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold transition-transform hover:scale-105 ${
+          className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-bold transition-transform hover:scale-105 ${
             location.pathname === '/assistant' ? 'bg-text text-bg' : 'text-muted hover:text-text'
           }`}
           title="Assistant"
@@ -153,7 +153,7 @@ export function TopBar() {
         >
           <Bot className="h-4 w-4" /> <span className="hidden lg:inline">Assistant</span>
         </button>
-        <button onClick={() => openImport()} className="hidden items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold text-muted transition-transform hover:scale-105 hover:text-text lg:flex" title="Download from link">
+        <button onClick={() => openImport()} className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-sm font-bold text-muted transition-transform hover:scale-105 hover:text-text lg:flex" title="Download from link">
           <Link2 className="h-4 w-4" /> Add from link
         </button>
         <button onClick={() => navigate('/downloads')} className={`icon-btn relative ${location.pathname === '/downloads' ? 'text-text' : ''}`} title="Downloads" aria-label="Downloads">

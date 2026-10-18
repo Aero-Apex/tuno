@@ -94,10 +94,14 @@ export function AssistantPage() {
         </p>
 
         {turns.length === 0 && (
-          <div className="flex flex-col items-start gap-2">
-            <p className="text-base text-text/90">Ask about your music. Try one of these:</p>
+          <div className="flex flex-col gap-2">
+            <p className="mb-1 text-base text-text/90">Ask about your music. Try one of these:</p>
             {STARTERS.map((s) => (
-              <button key={s} onClick={() => send(s)} className="chip">
+              <button
+                key={s}
+                onClick={() => send(s)}
+                className="w-full rounded-lg bg-elevated px-4 py-3 text-left text-[15px] text-text ring-1 ring-text/10 transition-colors hover:bg-text/10 md:w-auto md:self-start"
+              >
                 {s}
               </button>
             ))}
@@ -158,7 +162,7 @@ export function AssistantPage() {
             e.preventDefault();
             send();
           }}
-          className="sticky bottom-4 flex items-end gap-2 rounded-lg bg-elevated p-2 shadow-xl ring-1 ring-text/10"
+          className="sticky bottom-4 flex items-end gap-2 rounded-lg bg-elevated p-2 shadow-xl ring-1 ring-text/10 max-md:bottom-[calc(140px+env(safe-area-inset-bottom))]"
         >
           <textarea
             value={input}
