@@ -410,12 +410,20 @@ namespace TunoApp
 
     sealed class MainForm : Form
     {
-        const int CmdChangeServer = 0x1010, CmdReload = 0x1020, CmdCheckUpdate = 0x1030, CmdAutoUpdate = 0x1040;
+        const int CmdChangeServer = 0x1010, CmdReload = 0x1020, CmdCheckUpdate = 0x1030, CmdAutoUpdate = 0x1040, CmdSwitchMode = 0x1050;
+        // Updates always come from the public feed, even when the music is kept on this PC.
+        const string UpdateFeed = "https://tuno.eu.cc/";
         // Autoplay: a music app starts the next song without a click. The rest keeps the profile small.
         const string BrowserArgs = "--autoplay-policy=no-user-gesture-required --disable-features=Translate,msEdgeShoppingUI,msEdgeFollow";
         static readonly Color Back = Color.Black;
 
         readonly WebView2 web = new WebView2();
+        readonly DiscordPresence discord = new DiscordPresence();
+        // Discord work runs one piece at a time, off the window's thread, so a slow Discord can't stall the page.
+        readonly object discordGate = new object();
+        Task discordQueue = Task.FromResult(0);
+        string localCookie;
+        bool LocalMode { get { return Settings.Get("mode") == "local"; } }
         readonly string address;
         readonly System.Windows.Forms.Timer tick = new System.Windows.Forms.Timer { Interval = 30000 };
         string server;
@@ -445,6 +453,8 @@ namespace TunoApp
                 { "auto", AutoUpdate },
                 { "version", version != null ? version.ToString() : null },
                 { "message", message ?? "" },
+                { "local", LocalMode },
+                { "discord", Settings.Get("discord") != "0" },
             };
             core.PostWebMessageAsJson(new JavaScriptSerializer().Serialize(msg));
         }
@@ -477,6 +487,15 @@ namespace TunoApp
                 PostStatus(CurrentState(), null, null);
             }
             else if (kind == "get-status") PostStatus(CurrentState(), null, null);
+            else if (kind == "now-playing") NowPlaying(msg);
+            else if (kind == "set-discord")
+            {
+                object on;
+                bool turnOn = msg.TryGetValue("on", out on) && on is bool && (bool)on;
+                Settings.Set("discord", turnOn ? "1" : "0");
+                if (!turnOn) Discord(delegate { discord.Clear(); });
+                PostStatus(CurrentState(), null, null);
+            }
         }
 
         public MainForm(string address)
@@ -526,7 +545,8 @@ namespace TunoApp
             Native.DarkTitleBar(Handle);
             Native.AddSystemMenuItems(Handle,
                 new KeyValuePair<int, string>(CmdReload, "Reload\tF5"),
-                new KeyValuePair<int, string>(CmdChangeServer, "Change server..."),
+                new KeyValuePair<int, string>(CmdChangeServer, LocalMode ? "Connect to a Tuno server..." : "Change server..."),
+                new KeyValuePair<int, string>(CmdSwitchMode, "Run on this PC only..."),
                 new KeyValuePair<int, string>(CmdCheckUpdate, "Check for updates (v" + Updater.Current + ")"),
                 new KeyValuePair<int, string>(CmdAutoUpdate, "Update automatically"));
             Native.SetMenuCheck(Handle, CmdAutoUpdate, AutoUpdate);
@@ -538,6 +558,7 @@ namespace TunoApp
             {
                 int cmd = (int)m.WParam & 0xFFF0;
                 if (cmd == CmdChangeServer) { ChangeServer(); return; }
+                if (cmd == CmdSwitchMode) { if (!LocalMode) SwitchMode(true); return; }
                 if (cmd == CmdReload) { if (web.CoreWebView2 != null) Navigate(); return; }
                 if (cmd == CmdCheckUpdate) { StartUpdateCheck(true); return; }
                 if (cmd == CmdAutoUpdate)
@@ -568,6 +589,8 @@ namespace TunoApp
         {
             base.OnFormClosed(e);
             tick.Stop();
+            LocalEngine.Stop();
+            discord.Dispose();
             if (AutoUpdate) Updater.TryApplyPending(); // a downloaded update goes in when Tuno closes, so the next start is the new version
         }
 
@@ -631,7 +654,7 @@ namespace TunoApp
             }
             checking = true;
             if (fromWeb) PostStatus("checking", null, null);
-            string target = server;
+            string target = LocalMode ? UpdateFeed : server;
             Task.Run(delegate
             {
                 string message;
@@ -718,17 +741,39 @@ namespace TunoApp
             try
             {
                 string fromArgs = NormalizeUrl(address);
-                if (fromArgs != null) Settings.Server = fromArgs;
-                server = Settings.Server;
-                if (server == null)
+                if (fromArgs != null) { Settings.Server = fromArgs; Settings.Set("mode", "server"); }
+                if (Settings.Get("mode") == null)
                 {
-                    server = AskServer(this, null);
-                    if (server == null) { Close(); return; }
-                    Settings.Server = server;
+                    bool? choice = AskMode(this);
+                    if (choice == null) { Close(); return; }
+                    Settings.Set("mode", choice.Value ? "local" : "server");
+                }
+                if (LocalMode)
+                {
+                    LocalSession session = await Task.Run(() => LocalEngine.Start());
+                    if (session.Url == null)
+                    {
+                        MessageBox.Show(this, session.Error, "Tuno", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        Close();
+                        return;
+                    }
+                    server = session.Url;
+                    localCookie = session.Cookie;
+                }
+                else
+                {
+                    server = Settings.Server;
+                    if (server == null)
+                    {
+                        server = AskServer(this, null);
+                        if (server == null) { Close(); return; }
+                        Settings.Server = server;
+                    }
                 }
 
                 await web.EnsureCoreWebView2Async();
                 Configure(web.CoreWebView2);
+                if (localCookie != null) SetSessionCookie(web.CoreWebView2, localCookie);
                 Navigate();
                 tick.Start();
             }
@@ -757,7 +802,7 @@ namespace TunoApp
             st.IsPinchZoomEnabled = false;
             try { core.Profile.PreferredColorScheme = CoreWebView2PreferredColorScheme.Dark; } catch { }
             // The web page reads this to show the Windows update controls in Settings → Updates.
-            try { st.UserAgent = st.UserAgent + " TunoWindows/" + Updater.Current; } catch { }
+            try { st.UserAgent = st.UserAgent + " TunoWindows/" + Updater.Current + (LocalMode ? " TunoLocal" : ""); } catch { }
 
             core.NavigationCompleted += OnNavigationCompleted;
             core.NewWindowRequested += delegate (object s, CoreWebView2NewWindowRequestedEventArgs e)
@@ -825,12 +870,116 @@ namespace TunoApp
             }
         }
 
+        // ---- on this PC (local mode), the first-run question, and Discord ----
+
+        /// <summary>Restarts Tuno in the other mode. The new copy waits for this one to close (see --after-update).</summary>
+        void SwitchMode(bool toLocal)
+        {
+            Settings.Set("mode", toLocal ? "local" : "server");
+            try { Process.Start(Application.ExecutablePath, "--after-update"); } catch (Exception) { }
+            Close();
+        }
+
+        /// <summary>The first-run question: keep the music on this PC, or connect to a server. Null when cancelled.</summary>
+        static bool? AskMode(IWin32Window owner)
+        {
+            using (var f = new Form())
+            {
+                var label = new Label
+                {
+                    Text = "Where should Tuno keep your music?\n\nOn this PC: Tuno runs by itself, downloads songs to this PC and keeps them private. No server needed.\n\nOn a server: your music lives on a Tuno server, such as your home server.",
+                    AutoSize = true, MaximumSize = new Size(460, 0), Margin = new Padding(0, 0, 0, 14),
+                };
+                var thisPc = new Button { Text = "On this PC", DialogResult = DialogResult.Yes, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(30, 215, 96), ForeColor = Color.Black, AutoSize = true, Padding = new Padding(10, 2, 10, 2) };
+                var onServer = new Button { Text = "On a server", DialogResult = DialogResult.No, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(42, 42, 42), ForeColor = Color.White, AutoSize = true, Padding = new Padding(10, 2, 10, 2) };
+                var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(42, 42, 42), ForeColor = Color.White, AutoSize = true, Padding = new Padding(10, 2, 10, 2) };
+                thisPc.FlatAppearance.BorderSize = 0;
+                onServer.FlatAppearance.BorderSize = 0;
+                cancel.FlatAppearance.BorderSize = 0;
+                var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0) };
+                buttons.Controls.Add(thisPc);
+                buttons.Controls.Add(onServer);
+                buttons.Controls.Add(cancel);
+
+                var layout = new TableLayoutPanel { ColumnCount = 1, AutoSize = true, Dock = DockStyle.Fill, Padding = new Padding(18) };
+                layout.Controls.Add(label);
+                layout.Controls.Add(buttons);
+
+                f.Text = "Tuno";
+                f.Font = new Font("Segoe UI", 9f);
+                f.AutoScaleMode = AutoScaleMode.Dpi;
+                f.AutoScaleDimensions = new SizeF(96f, 96f);
+                f.BackColor = Color.FromArgb(24, 24, 24);
+                f.ForeColor = Color.White;
+                f.FormBorderStyle = FormBorderStyle.FixedDialog;
+                f.MaximizeBox = f.MinimizeBox = false;
+                f.ShowInTaskbar = false;
+                f.StartPosition = owner == null ? FormStartPosition.CenterScreen : FormStartPosition.CenterParent;
+                f.AutoSize = true;
+                f.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+                f.AcceptButton = thisPc;
+                f.CancelButton = cancel;
+                f.Controls.Add(layout);
+                f.HandleCreated += delegate { Native.DarkTitleBar(f.Handle); };
+                DialogResult result = f.ShowDialog(owner);
+                if (result == DialogResult.Yes) return true;
+                if (result == DialogResult.No) return false;
+                return null;
+            }
+        }
+
+        /// <summary>The page talks to the engine as the owner, so the session cookie is handed to the page at start.</summary>
+        static void SetSessionCookie(CoreWebView2 core, string value)
+        {
+            CoreWebView2Cookie cookie = core.CookieManager.CreateCookie("tuno_session", value, "127.0.0.1", "/");
+            cookie.IsHttpOnly = true;
+            core.CookieManager.AddOrUpdateCookie(cookie);
+        }
+
+        /// <summary>The page reports the song and whether it's playing; Discord shows it while it plays.</summary>
+        void NowPlaying(Dictionary<string, object> msg)
+        {
+            if (Settings.Get("discord") == "0") { Discord(delegate { discord.Clear(); }); return; }
+            bool playing = msg.ContainsKey("playing") && msg["playing"] is bool && (bool)msg["playing"];
+            string title = (msg.ContainsKey("title") ? msg["title"] as string : null) ?? "";
+            string artist = (msg.ContainsKey("artist") ? msg["artist"] as string : null) ?? "";
+            double position = Number(msg, "position");
+            double duration = Number(msg, "duration");
+            Discord(delegate
+            {
+                if (playing && title.Length > 0) discord.Show(title, artist, position, duration);
+                else discord.Clear();
+            });
+        }
+
+        static double Number(Dictionary<string, object> msg, string key)
+        {
+            object value;
+            if (!msg.TryGetValue(key, out value) || value == null) return 0;
+            try { return Convert.ToDouble(value, CultureInfo.InvariantCulture); }
+            catch (Exception) { return 0; }
+        }
+
+        /// <summary>Queues Discord work. Each piece runs after the one before it, on a thread-pool thread.</summary>
+        void Discord(Action work)
+        {
+            lock (discordGate)
+            {
+                discordQueue = discordQueue.ContinueWith(delegate
+                {
+                    try { work(); } catch (Exception) { }
+                });
+            }
+        }
+
         void ChangeServer()
         {
-            string next = AskServer(this, server);
-            if (next == null || next == server) return;
-            server = next;
+            string next = AskServer(this, LocalMode ? null : server);
+            if (next == null) return;
             Settings.Server = next;
+            if (LocalMode) { SwitchMode(false); return; }
+            if (next == server) return;
+            server = next;
             if (web.CoreWebView2 != null) Navigate();
         }
 

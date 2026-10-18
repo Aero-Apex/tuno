@@ -202,6 +202,7 @@ private fun App(vm: TunoViewModel) {
                 NowPlaying(vm) { vm.playerOpen = false }
             }
             Sheets(vm)
+            WhatsNewDialog()
         }
     }
 }

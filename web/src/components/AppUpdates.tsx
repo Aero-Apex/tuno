@@ -3,23 +3,7 @@ import { Download, Monitor, RefreshCw, RotateCw, Smartphone } from 'lucide-react
 import { useEffect, useState, type ReactNode } from 'react';
 import { api, type AppInfo } from '../lib/api';
 import { fmtBytes } from '../lib/format';
-
-/**
- * The Windows app is this same page inside its WebView2 window. The window says so in the user agent ("TunoWindows/1.1.4")
- * and exposes a message channel that the updater answers on.
- */
-interface ShellBridge {
-  postMessage(message: unknown): void;
-  addEventListener(type: 'message', fn: (e: { data: unknown }) => void): void;
-  removeEventListener(type: 'message', fn: (e: { data: unknown }) => void): void;
-}
-
-function windowsApp(): { version: string; bridge: ShellBridge | null } | null {
-  const v = navigator.userAgent.match(/TunoWindows\/([\d.]+)/);
-  if (!v) return null;
-  const bridge = (window as unknown as { chrome?: { webview?: ShellBridge } }).chrome?.webview ?? null;
-  return { version: v[1], bridge };
-}
+import { windowsApp, type ShellBridge } from '../lib/windows';
 
 interface ShellStatus {
   type?: string;
@@ -122,7 +106,7 @@ function WindowsUpdates({ version, bridge }: { version: string; bridge: ShellBri
   );
 }
 
-function Switch({ value, onChange, label, disabled }: { value: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
+export function Switch({ value, onChange, label, disabled }: { value: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   return (
     <button
       role="switch"

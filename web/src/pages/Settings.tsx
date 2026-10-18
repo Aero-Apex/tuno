@@ -3,6 +3,8 @@ import { Check, Download, HardDrive, ImagePlus, Loader2, RefreshCw, RotateCcw, T
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AppUpdates } from '../components/AppUpdates';
+import { ThisPc } from '../components/ThisPc';
+import { windowsApp } from '../lib/windows';
 import { readImage } from '../components/Dialogs';
 import { Page } from '../components/Page';
 import { Storage } from './Storage';
@@ -19,6 +21,7 @@ const TABS = [
   { id: 'appearance', label: 'Appearance', admin: false },
   { id: 'storage', label: 'Storage', admin: false },
   { id: 'updates', label: 'Updates', admin: false },
+  { id: 'thispc', label: 'This PC', admin: false },
   { id: 'assistant', label: 'Assistant', admin: false },
   { id: 'users', label: 'Users', admin: true },
   { id: 'sources', label: 'Sources', admin: true },
@@ -29,7 +32,8 @@ const TABS = [
 export function SettingsPage() {
   const [params, setParams] = useSearchParams();
   const isAdmin = useAuth((s) => !!s.user?.isAdmin);
-  const tabs = TABS.filter((t) => isAdmin || !t.admin);
+  // "This PC" only exists in the Windows app, where those settings live.
+  const tabs = TABS.filter((t) => (isAdmin || !t.admin) && (t.id !== 'thispc' || !!windowsApp()));
   const requested = params.get('tab');
   const tab = tabs.find((t) => t.id === requested)?.id ?? 'account';
   return (
@@ -47,6 +51,7 @@ export function SettingsPage() {
         {tab === 'appearance' && <Appearance />}
         {tab === 'storage' && <Storage />}
         {tab === 'updates' && <AppUpdates />}
+        {tab === 'thispc' && <ThisPc />}
         {tab === 'assistant' && <AssistantSettings />}
         {tab === 'users' && <Users />}
         {tab === 'sources' && <Sources />}

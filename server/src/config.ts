@@ -20,6 +20,8 @@ export const config = {
   webDist: path.resolve(process.env.TUNO_WEB ?? path.join(root, '..', 'web', 'dist')),
   /** Python interpreter that has yt-dlp installed; we always run `python -m yt_dlp`. */
   python: process.env.YTDLP_PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3'),
+  /** A standalone yt-dlp executable (the on-PC edition). When set, it's used instead of `python -m yt_dlp`. */
+  ytdlpExe: process.env.YTDLP_EXE ?? '',
   /** JS runtime yt-dlp uses to solve YouTube challenges (needs Node 22+), e.g. "node" or "node:/path/to/node". */
   jsRuntime: process.env.YTDLP_JS_RUNTIME ?? 'node',
   ffmpeg: process.env.FFMPEG ?? 'ffmpeg',

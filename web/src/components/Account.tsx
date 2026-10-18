@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Bot, Download, HardDrive, Keyboard, Link2, LogOut, Palette, Settings, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
+import { windowsApp } from '../lib/windows';
 import { fmtBytes } from '../lib/format';
 import { useAuth } from '../store/auth';
 import { useUI } from '../store/ui';
@@ -59,7 +60,8 @@ export function AccountButton({ ring, className = '' }: { ring?: boolean; classN
           { label: 'Download from link', icon: <Link2 className="h-4 w-4" />, onClick: () => useUI.getState().openImport() },
           { label: 'Keyboard shortcuts', icon: <Keyboard className="h-4 w-4" />, onClick: () => navigate('/settings?tab=shortcuts') },
           { label: '', divider: true },
-          { label: 'Log out', icon: <LogOut className="h-4 w-4" />, onClick: () => logout() },
+          // On this PC the owner signs in automatically, so there's no sign-in to come back to.
+          ...(windowsApp()?.local ? [] : [{ label: 'Log out', icon: <LogOut className="h-4 w-4" />, onClick: () => logout() }]),
         ])}
       />
     </>

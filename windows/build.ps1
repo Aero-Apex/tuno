@@ -50,7 +50,7 @@ if (-not (Test-Path (Join-Path $here 'update-public.key'))) { throw 'Run new-sig
 # 4) Compile
 Write-Host '==> Compiling' -ForegroundColor Cyan
 $exe = Join-Path $Out 'Tuno.exe'
-$refs = @('mscorlib', 'System', 'System.Core', 'System.Drawing', 'System.Windows.Forms', 'System.Web.Extensions') | ForEach-Object { "/r:$fw\$_.dll" }
+$refs = @('mscorlib', 'System', 'System.Core', 'System.Drawing', 'System.Windows.Forms', 'System.Web.Extensions', 'System.Security') | ForEach-Object { "/r:$fw\$_.dll" }
 & dotnet $csc /nologo /noconfig /nostdlib+ /target:winexe /platform:x64 /optimize+ /debug- /langversion:latest `
   "/out:$exe" "/win32icon:$here\tuno.ico" "/win32manifest:$here\app.manifest" `
   $refs "/r:$core" "/r:$deps\lib\net462\Microsoft.Web.WebView2.WinForms.dll" `
@@ -59,6 +59,6 @@ $refs = @('mscorlib', 'System', 'System.Core', 'System.Drawing', 'System.Windows
   "/resource:$loaderGz,WebView2Loader.dll.gz" `
   "/resource:$here\tuno.ico,tuno.ico" `
   "/resource:$here\update-public.key,update-public.key" `
-  "$here\Tuno.cs" $info
+  "$here\Tuno.cs" "$here\Discord.cs" "$here\Local.cs" $info
 if ($LASTEXITCODE -ne 0) { throw 'compile failed' }
 Write-Host ("==> Built Tuno {0}: {1} ({2:N0} KB)" -f $Version, $exe, ((Get-Item $exe).Length / 1KB)) -ForegroundColor Green

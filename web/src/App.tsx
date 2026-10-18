@@ -15,6 +15,7 @@ import { HomePage } from './pages/Home';
 import { usePlayer } from './store/player';
 import { useTheme } from './store/theme';
 import { useUI } from './store/ui';
+import { WhatsNew } from './components/WhatsNew';
 
 // Home ships with the app; every other page loads on first visit.
 const SearchPage = lazy(() => import('./pages/Search').then((m) => ({ default: m.SearchPage })));
@@ -129,6 +130,7 @@ export default function App() {
 
   return (
     <div className="relative flex h-full flex-col bg-surface">
+      <WhatsNew />
       {theme.bgImage && (
         <div className="pointer-events-none fixed inset-0 -z-0" aria-hidden>
           <img src={theme.bgImage} alt="" className="h-full w-full scale-110 object-cover" style={{ filter: `blur(${theme.bgBlur}px)` }} />

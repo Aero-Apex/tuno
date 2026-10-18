@@ -148,6 +148,10 @@ class Prefs(ctx: Context) {
     var lastUpdateCheck: Long
         get() = sp.getLong("lastUpdateCheck", 0L)
         set(v) = sp.edit().putLong("lastUpdateCheck", v).apply()
+    /** The version whose "what's new" screen was dismissed last. */
+    var seenVersion: String
+        get() = sp.getString("seenVersion", "")!!
+        set(v) = sp.edit().putString("seenVersion", v).apply()
 
     companion object {
         const val DEFAULT_SERVER = "https://tuno.eu.cc"

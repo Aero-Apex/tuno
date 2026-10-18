@@ -21,7 +21,14 @@ export const cookiesFile = path.join(config.dataDir, 'cookies.txt');
 
 /** Base flags used for every yt-dlp call. */
 function baseArgs(): string[] {
-  const args = ['-m', 'yt_dlp', '--no-colors', '--ignore-config', '--js-runtimes', config.jsRuntime];
+  // The on-PC edition ships a standalone yt-dlp.exe; the server edition runs yt-dlp as a Python module.
+  const args = [
+    ...(config.ytdlpExe ? [] : ['-m', 'yt_dlp']),
+    '--no-colors',
+    '--ignore-config',
+    '--js-runtimes',
+    config.jsRuntime,
+  ];
   if (fs.existsSync(cookiesFile)) args.push('--cookies', cookiesFile);
   return args;
 }
@@ -29,8 +36,11 @@ function baseArgs(): string[] {
 export function runYtdlp(args: string[], opts: RunOptions = {}): Promise<RunResult> {
   return new Promise((resolve, reject) => {
     // Run at low priority (yt-dlp and the ffmpeg it starts) so downloads never slow the rest of the server.
-    const [cmd, cmdArgs] =
-      process.platform === 'win32' ? [config.python, [...baseArgs(), ...args]] : ['nice', ['-n', '10', config.python, ...baseArgs(), ...args]];
+    const [cmd, cmdArgs] = config.ytdlpExe
+      ? [config.ytdlpExe, [...baseArgs(), ...args]]
+      : process.platform === 'win32'
+        ? [config.python, [...baseArgs(), ...args]]
+        : ['nice', ['-n', '10', config.python, ...baseArgs(), ...args]];
     const child = spawn(cmd, cmdArgs, {
       env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
       windowsHide: true,
@@ -249,6 +259,12 @@ export async function version(): Promise<string> {
 }
 
 export async function update(): Promise<string> {
+  if (config.ytdlpExe) {
+    // yt-dlp.exe updates itself in place.
+    const res = await runYtdlp(['-U'], { timeoutMs: 300_000 });
+    if (res.code !== 0) throw new Error(ytdlpError(res.stderr));
+    return res.stdout;
+  }
   return new Promise((resolve, reject) => {
     const child = spawn(config.python, ['-m', 'pip', 'install', '-U', '--disable-pip-version-check', 'yt-dlp[default]'], {
       windowsHide: true,

@@ -9,6 +9,10 @@ import { useAuth } from './store/auth';
 import { usePlayer } from './store/player';
 import './index.css';
 import './store/theme';
+import { startNowPlayingBridge } from './lib/nowPlaying';
+
+// In the Windows app, tell the window what's playing (for Discord).
+startNowPlayingBridge();
 
 // After a redeploy, a tab that's still open references page files from the old build, which are gone.
 // Reload once to pick up the new version (guarded so a real outage can't cause a reload loop).
