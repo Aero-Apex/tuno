@@ -1,6 +1,17 @@
 # Tuno
 
-Tuno is your own music hub, a mix of YouTube Music, Spotify and SoundCloud that runs on your home server.
+Tuno is your own music hub. Paste a link, search, and download the music you own to your server or your PC. Then listen
+in a Spotify-style app on the web, on Windows and on Android. No account, no cloud, no tracking.
+
+**Why Tuno**
+
+- **Private by design.** Your library lives on your server or your PC. Nothing is sent to a third party except the
+  download requests themselves.
+- **Works where you are.** Use the web app, the Windows app (connect to a server, or run entirely on one PC), or the Android app.
+- **Feels like Spotify, looks like you.** Search across sources, make playlists, and theme every color and layout.
+
+> Use Tuno for music you have the right to keep. Downloading from some sites can break their terms of service.
+> Tuno is a young, one-person project: expect rough edges, and report them.
 
 - **Paste a link** to a song, album or playlist. Tuno downloads it to your server and you can play it any time, even if the original disappears.
 - **Search** YouTube Music, YouTube, SoundCloud and your library at once. You can stream any result right away, or tap ☁ to keep it.
@@ -8,6 +19,17 @@ Tuno is your own music hub, a mix of YouTube Music, Spotify and SoundCloud that 
 - **Fully themeable** under Settings → Appearance: presets, every color, fonts, corner roundness, density, sidebar side, floating player, background image with blur, album-art colors, a visualizer and custom CSS. You can export and import themes. The theme is saved on the server, so every device gets it.
 
 **Live at https://tuno.eu.cc** (through a Cloudflare tunnel), and at http://192.168.88.32:7070 on the home network.
+
+## Download
+
+Get the latest build from the [Releases](../../releases) page:
+
+- **`Tuno-<version>.apk`**: the Android app. Install it once; it updates itself after that.
+- **`Tuno-<version>.exe`**: the Windows app, for connecting to a Tuno server.
+- **`Tuno-<version>-on-this-PC.zip`**: the Windows app with its own engine. Unzip it and run `Tuno.exe`. No server needed;
+  songs download to this PC and stay private. It's large because ffmpeg is included.
+
+To run the server yourself, see [Deploy / update](#deploy--update) below.
 
 ## Using it
 
@@ -87,6 +109,12 @@ To build it yourself, see [`android/README.md`](android/README.md).
 pointed at your server. It adds what a browser tab can't: its own taskbar entry and icon, media keys and the Windows
 media overlay, remembered window size, a friendly "can't reach your server" page that reconnects by itself, and
 automatic memory trimming while minimized. Run `windows/build.ps1` to build it; see [`windows/README.md`](windows/README.md).
+
+It also runs **on its own, with no server**: `windows/build-local.ps1` bundles Node, the Tuno engine, yt-dlp and ffmpeg
+into a folder. Choose "On this PC" at first start. The library is bound to that PC and Windows account.
+
+Discord: the Windows app can show what you're listening to on your Discord profile, like Spotify does. Turn it on or
+off under Settings → This PC. Discord must be open on the same PC.
 
 ## Automatic updates (Android and Windows)
 
