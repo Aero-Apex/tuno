@@ -303,7 +303,8 @@ audio.addEventListener('error', () => {
   if (!audio.getAttribute('src')) return;
   usePlayer.setState({ loading: false, playing: false, error: 'Could not play this track' });
   const { queue, index } = usePlayer.getState();
-  if (++errorStreak <= 3 && index < queue.length - 1) {
+  // Skip past songs that can't play (YouTube bot checks, removed uploads) and keep going through the queue.
+  if (++errorStreak <= 10 && index < queue.length - 1) {
     const failed = queue[index]?.qid;
     setTimeout(() => {
       // Only skip if the user hasn't picked something else meanwhile.
