@@ -1,20 +1,26 @@
 #!/bin/bash
-# Builds Tuno for macOS (one universal app for Apple Silicon and Intel) and zips it. Needs Go, nothing else:
-# it works on a Mac, on Linux, and on Windows (Git Bash) alike, because the app needs no C compiler.
-# On Windows you can also run build.ps1.
+# Builds Tuno for macOS (one universal app for Apple Silicon and Intel) and zips it.
+# On a Mac it uses Rust alone; on Linux (and in GitHub Actions) Zig links the Mac binaries, so no Mac is needed.
+# Needs Rust (rustup.rs) and, once:
+#   rustup target add aarch64-apple-darwin x86_64-apple-darwin
+#   on Linux also:  pip install ziglang cargo-zigbuild
+# On Windows, use build.ps1.
 #   Usage:  bash mac/build.sh   ->  mac/dist/Tuno-<version>-mac.zip
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
-cd "$here"
-version="$(tr -d '[:space:]' < VERSION)"
+root="$(dirname "$here")"
+desktop="$root/desktop"
+version="$(tr -d '[:space:]' < "$here/VERSION")"
 
-rm -rf obj
-mkdir -p obj dist
-for arch in arm64 amd64; do
-  echo "==> Compiling Tuno $version for $arch"
-  CGO_ENABLED=0 GOOS=darwin GOARCH=$arch go build -trimpath -ldflags "-s -w" -o "obj/tuno-$arch" ./app
+build=(cargo zigbuild)
+[ "$(uname)" = "Darwin" ] && build=(cargo build)
+for target in aarch64-apple-darwin x86_64-apple-darwin; do
+  echo "==> Compiling Tuno $version for $target"
+  "${build[@]}" --release --target "$target" --manifest-path "$desktop/Cargo.toml"
 done
 
 echo "==> Packing Tuno.app"
-go run ./pack -version "$version" -arm64 obj/tuno-arm64 -amd64 obj/tuno-amd64 -icon ../web/public/icon-512.png -out dist
+cargo run --release --manifest-path "$desktop/pack/Cargo.toml" -- "$version" \
+  "$desktop/target/aarch64-apple-darwin/release/tuno" "$desktop/target/x86_64-apple-darwin/release/tuno" \
+  "$root/web/public/icon-512.png" "$here/Info.plist" "$here/dist"

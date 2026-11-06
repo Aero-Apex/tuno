@@ -1,4 +1,4 @@
-# Builds the macOS app. It's Go with no C compiler involved, so an ordinary Linux runner can build it.
+# Builds the macOS app. Zig links the Mac binaries, so an ordinary Linux runner can build it.
 # Run it by hand from the Actions tab ("Run workflow"): the zip is attached to the run.
 # Pushing a version tag (v1.2.0) also builds it and adds the zip to that tag's GitHub release.
 name: macOS app
@@ -17,9 +17,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: mac/go.mod
+      - name: Set up Rust, Zig and cargo-zigbuild
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          pip install ziglang cargo-zigbuild
 
       - name: Build Tuno.app
         run: bash mac/build.sh

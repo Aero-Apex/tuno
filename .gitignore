@@ -9,3 +9,6 @@ library/
 
 # Kotlin compiler cache
 android/.kotlin/
+
+# Rust builds (desktop app)
+target/

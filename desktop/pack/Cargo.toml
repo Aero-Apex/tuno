@@ -1,0 +1,10 @@
+[package]
+name = "pack"
+version = "0.0.0"
+edition = "2021"
+description = "Turns the two macOS builds of Tuno into Tuno.app and zips it (runs on any OS)"
+publish = false
+
+[dependencies]
+png = "0.18"
+zip = { version = "9", default-features = false, features = ["deflate-flate2"] }

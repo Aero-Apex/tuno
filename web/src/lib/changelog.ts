@@ -15,6 +15,28 @@ export interface ChangeEntry {
 
 /** What changed in each release, shown once after an update. Keep it in step with the release notes. */
 export const CHANGELOG: Record<string, ChangeEntry> = {
+  '1.2.1': {
+    title: 'A new desktop app',
+    sections: [
+      {
+        heading: 'Changed',
+        items: [
+          {
+            title: 'Rebuilt from the ground up',
+            text: 'The Windows and Mac apps are now one small program written in Rust. Each download is under 1 MB, and Windows no longer needs .NET.',
+          },
+          {
+            title: 'Setup inside the window',
+            text: 'Choosing where your music lives and entering your server now happens right here, in the same dark style as Tuno. Switching between this PC and a server no longer restarts the app.',
+          },
+          {
+            title: 'Sharp on every screen',
+            text: 'On Windows, Tuno stays crisp when you move it between monitors with different scaling.',
+          },
+        ],
+      },
+    ],
+  },
   '1.2.0': {
     title: 'Autoplay',
     sections: [

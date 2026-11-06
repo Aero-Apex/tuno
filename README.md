@@ -93,7 +93,7 @@ Local development needs Python with `pip install "yt-dlp[default]"`, plus ffmpeg
 
 ## Stack
 
-Node 22 · Fastify · SQLite (better-sqlite3) · yt-dlp + ffmpeg · youtubei.js (YT Music search) · React 19 · Vite · Tailwind · Zustand · TanStack Query · Docker.
+Node 22 · Fastify · SQLite (better-sqlite3) · yt-dlp + ffmpeg · youtubei.js (YT Music search) · React 19 · Vite · Tailwind · Zustand · TanStack Query · Docker · Rust (desktop apps) · Kotlin (Android).
 
 ## Android app
 
@@ -107,8 +107,8 @@ To build it yourself, see [`android/README.md`](android/README.md).
 
 ## Windows app
 
-[`windows/`](windows) builds `Tuno.exe`, a ~370 KB native window around the WebView2 runtime that Windows already has,
-pointed at your server. It adds what a browser tab can't: its own taskbar entry and icon, media keys and the Windows
+[`windows/`](windows) builds `Tuno.exe`, a native window under 1 MB around the WebView2 runtime that Windows already
+has, pointed at your server. It adds what a browser tab can't: its own taskbar entry and icon, media keys and the Windows
 media overlay, remembered window size, a friendly "can't reach your server" page that reconnects by itself, and
 automatic memory trimming while minimized. Run `windows/build.ps1` to build it; see [`windows/README.md`](windows/README.md).
 
@@ -122,9 +122,10 @@ off under Settings → This PC. Discord must be open on the same PC.
 
 [`mac/`](mac) builds `Tuno.app`, a small native window (AppKit and WebKit, no Electron) around your server, like the
 Windows app: its own Dock icon and menu bar, music that keeps playing when the window is closed, a remembered window,
-a "can't reach your server" page that reconnects by itself, and your Discord listening status. It's written in Go with
-no C compiler involved, so it builds on any computer, Windows included: run `mac/build.ps1` (or `bash mac/build.sh`).
-See [`mac/README.md`](mac/README.md).
+a "can't reach your server" page that reconnects by itself, and your Discord listening status. It builds on any
+computer, Windows included: run `mac/build.ps1` (or `bash mac/build.sh`). See [`mac/README.md`](mac/README.md).
+
+Both desktop apps are one Rust program in [`desktop/`](desktop).
 
 ## Automatic updates (Android and Windows)
 

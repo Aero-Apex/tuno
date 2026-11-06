@@ -1,7 +1,8 @@
 # Tuno for macOS
 
 `Tuno.app` is a small native window (AppKit and WebKit, no Electron) around your Tuno server's web app. It runs on
-macOS 11 and newer, on both Apple Silicon and Intel Macs, and the download is about 6 MB.
+macOS 11 and newer, on both Apple Silicon and Intel Macs, and the download is under 1 MB. It's written in Rust; the
+code is in [`../desktop`](../desktop) and is shared with the Windows app.
 
 What it adds over a browser tab:
 
@@ -13,7 +14,8 @@ What it adds over a browser tab:
   Settings → This Mac.
 - Links to other sites open in your browser, and downloads go to your Downloads folder.
 
-The first time it opens, it asks for your server's address (`https://tuno.eu.cc` is filled in).
+The first time it opens, it asks for your server's address (`https://tuno.eu.cc` is filled in). Settings live in
+`~/Library/Application Support/Tuno`.
 
 ## Install
 
@@ -36,22 +38,22 @@ After the first time, Tuno opens normally. It doesn't update itself yet: install
 
 ## Build
 
-It's written in Go against the Objective-C runtime ([purego](https://github.com/ebitengine/purego)), with no C
-compiler involved, so **any computer with Go can build it**. No Mac needed:
+No Mac is needed. Tuno opens AppKit and WebKit when it starts instead of linking them, so nothing from Apple's SDK is
+needed to build it, and [Zig](https://ziglang.org) links the Mac binaries.
 
 - **Windows:** `.\mac\build.ps1`
-- **Mac or Linux:** `bash mac/build.sh`
+- **Mac or Linux:** `bash mac/build.sh` (a Mac needs only Rust)
 - **GitHub:** Actions → **macOS app** → **Run workflow**, or push a version tag (the zip is added to its release).
 
-Both scripts compile the app for Apple Silicon and Intel, then `go run ./pack` joins them into one universal
-binary, makes the Dock icon from `web/public/icon-512.png`, writes `Info.plist` and zips `Tuno.app` into
-`mac/dist`. Go's linker signs the Apple Silicon build itself, which is what Apple Silicon Macs need to run it.
+Once, install Rust ([rustup.rs](https://rustup.rs)), the two Mac targets and, except on a Mac, Zig and cargo-zigbuild:
+
+```bash
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+python -m pip install --user ziglang cargo-zigbuild
+```
+
+The scripts compile the app for Apple Silicon and Intel, then `desktop/pack` joins them into one universal binary,
+makes the Dock icon from `web/public/icon-512.png`, writes `Info.plist` and zips `Tuno.app` into `mac/dist`. Zig's
+linker signs the Apple Silicon build, which is what Apple Silicon Macs need to run it.
 
 The version comes from `mac/VERSION`.
-
-| File | What it does |
-| --- | --- |
-| `app/main.go` | The window, menu bar, web view, offline page, downloads and the messages to and from the page |
-| `app/discord.go` | The Discord listening status, over Discord's local socket |
-| `app/cocoa.go` | Small helpers for calling AppKit and WebKit from Go |
-| `pack/main.go` | Builds the universal binary, the icon and the zip |
