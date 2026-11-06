@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AppUpdates } from '../components/AppUpdates';
 import { ThisPc } from '../components/ThisPc';
-import { windowsApp } from '../lib/windows';
+import { desktopApp } from '../lib/windows';
 import { readImage } from '../components/Dialogs';
 import { Page } from '../components/Page';
 import { Storage } from './Storage';
@@ -34,8 +34,11 @@ const TABS = [
 export function SettingsPage() {
   const [params, setParams] = useSearchParams();
   const isAdmin = useAuth((s) => !!s.user?.isAdmin);
-  // "This PC" only exists in the Windows app, where those settings live.
-  const tabs = TABS.filter((t) => (isAdmin || !t.admin) && (t.id !== 'thispc' || !!windowsApp()));
+  // "This PC" only exists in the Windows and Mac apps, where those settings live.
+  const desktop = desktopApp();
+  const tabs = TABS.filter((t) => (isAdmin || !t.admin) && (t.id !== 'thispc' || !!desktop)).map((t) =>
+    t.id === 'thispc' && desktop?.platform === 'mac' ? { ...t, label: 'This Mac' } : t,
+  );
   const requested = params.get('tab');
   const tab = tabs.find((t) => t.id === requested)?.id ?? 'account';
   return (

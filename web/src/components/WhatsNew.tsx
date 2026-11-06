@@ -1,13 +1,13 @@
 import { X } from 'lucide-react';
 import { useState } from 'react';
 import { CHANGELOG } from '../lib/changelog';
-import { windowsApp } from '../lib/windows';
+import { desktopApp } from '../lib/windows';
 
 const SEEN_KEY = 'tuno-whats-new-version';
 
 /** After an update, shows what changed in the new version. Shown once per version. */
 export function WhatsNew() {
-  const version = windowsApp()?.version ?? null;
+  const version = desktopApp()?.version ?? null;
   const entry = version ? CHANGELOG[version] : undefined;
   const [open, setOpen] = useState(() => {
     if (!version || !entry) return false;

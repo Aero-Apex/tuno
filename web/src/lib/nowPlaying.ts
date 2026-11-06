@@ -1,12 +1,12 @@
 import { itemArtist, itemDuration, itemTitle, usePlayer } from '../store/player';
-import { windowsApp } from './windows';
+import { desktopApp } from './windows';
 
 /**
- * Tells the Windows app what's playing, so Discord can show it. Sends only when the song or the play state changes,
+ * Tells the Windows or Mac app what's playing, so Discord can show it. Sends only when the song or the play state changes,
  * or when playback jumps (a seek), not on every progress tick.
  */
 export function startNowPlayingBridge() {
-  const bridge = windowsApp()?.bridge;
+  const bridge = desktopApp()?.bridge;
   if (!bridge) return;
   let lastKey = '';
   let lastAt = 0;

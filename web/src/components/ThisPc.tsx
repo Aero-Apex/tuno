@@ -1,6 +1,6 @@
 import { HardDrive, Radio } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import { windowsApp } from '../lib/windows';
+import { desktopApp } from '../lib/windows';
 import { Switch } from './AppUpdates';
 
 interface ShellState {
@@ -9,11 +9,12 @@ interface ShellState {
   discord?: boolean;
 }
 
-/** Settings → This PC: the Windows app's own settings (where the music lives, and Discord). */
+/** Settings → This PC / This Mac: the desktop app's own settings (where the music lives, and Discord). */
 export function ThisPc() {
-  const win = windowsApp();
-  const bridge = win?.bridge ?? null;
-  const [state, setState] = useState<ShellState>({ local: win?.local, discord: true });
+  const app = desktopApp();
+  const bridge = app?.bridge ?? null;
+  const mac = app?.platform === 'mac';
+  const [state, setState] = useState<ShellState>({ local: app?.local, discord: true });
 
   useEffect(() => {
     if (!bridge) return;
@@ -33,18 +34,21 @@ export function ThisPc() {
 
   return (
     <div className="space-y-5">
-      <Panel icon={<HardDrive className="h-6 w-6" />} title="Where your music lives" subtitle={state.local ? 'On this PC' : 'On your Tuno server'}>
-        <p className="text-sm text-muted">
-          {state.local
-            ? 'Songs you download stay on this PC, in Tuno\'s own folder for your account. Nothing needs a server, and the library opens only on this PC.'
-            : 'Songs you download are kept on the Tuno server you connect to. To keep music on this PC instead, choose "Run on this PC only" from the Tuno window\'s menu.'}
-        </p>
-      </Panel>
+      {/* The Mac app always uses a server, so there's nothing to choose here. */}
+      {!mac && (
+        <Panel icon={<HardDrive className="h-6 w-6" />} title="Where your music lives" subtitle={state.local ? 'On this PC' : 'On your Tuno server'}>
+          <p className="text-sm text-muted">
+            {state.local
+              ? 'Songs you download stay on this PC, in Tuno\'s own folder for your account. Nothing needs a server, and the library opens only on this PC.'
+              : 'Songs you download are kept on the Tuno server you connect to. To keep music on this PC instead, choose "Run on this PC only" from the Tuno window\'s menu.'}
+          </p>
+        </Panel>
+      )}
 
       <Panel icon={<Radio className="h-6 w-6" />} title="Discord" subtitle="Listening on your profile">
         <div className="flex items-center justify-between gap-4">
           <p className="text-sm text-muted">
-            Shows the song, its artist and its progress on your Discord profile, like Spotify does. Discord must be open on this PC.
+            Shows the song, its artist and its progress on your Discord profile, like Spotify does. Discord must be open on this {mac ? 'Mac' : 'PC'}.
           </p>
           <Switch value={!!state.discord} disabled={!bridge} onChange={setDiscord} label="Show what I'm listening to on Discord" />
         </div>
