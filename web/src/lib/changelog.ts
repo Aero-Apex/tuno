@@ -15,6 +15,29 @@ export interface ChangeEntry {
 
 /** What changed in each release, shown once after an update. Keep it in step with the release notes. */
 export const CHANGELOG: Record<string, ChangeEntry> = {
+  '1.2.0': {
+    title: 'Autoplay',
+    sections: [
+      {
+        heading: 'New',
+        items: [
+          {
+            title: 'Autoplay',
+            text: 'When your playlist or queue ends, Tuno keeps playing more songs from your library, starting with the artists you were listening to. Turn it off in Settings → Playback.',
+          },
+        ],
+      },
+      {
+        heading: 'Fixed',
+        items: [
+          {
+            title: 'Music no longer stops after a few songs fail',
+            text: 'Songs that can\'t be played (for example when YouTube asks to confirm you\'re not a bot) are skipped, and the queue keeps going.',
+          },
+        ],
+      },
+    ],
+  },
   '1.1.6': {
     title: 'Tuno on this PC, and Discord',
     sections: [

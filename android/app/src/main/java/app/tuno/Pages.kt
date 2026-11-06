@@ -344,6 +344,8 @@ fun SettingsScreen(vm: TunoViewModel) {
                 Icon(TIcons.ChevronRight, null, tint = S.Subdued, modifier = Modifier.size(18.dp))
             }
 
+            PlaybackSettings()
+
             UpdateSettings(vm)
 
             AssistantSettings(vm)
@@ -357,6 +359,32 @@ fun SettingsScreen(vm: TunoViewModel) {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { PillButton("Log out", { vm.logout() }) }
             BottomSpace(vm)
         }
+    }
+}
+
+@Composable
+private fun PlaybackSettings() {
+    val prefs = (LocalContext.current.applicationContext as TunoApp).prefs
+    val accent = LocalAccent.current
+    var autoplay by remember { mutableStateOf(prefs.autoplay) }
+    val set = { on: Boolean -> prefs.autoplay = on; autoplay = on }
+    SettingsHeading("Playback")
+    SettingRow(
+        "Autoplay",
+        "When your playlist or queue ends, keep playing more songs from your library, starting with the artists you were listening to.",
+        onClick = { set(!autoplay) },
+    ) {
+        Switch(
+            checked = autoplay,
+            onCheckedChange = { set(it) },
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = accent.color,
+                checkedThumbColor = accent.on,
+                uncheckedTrackColor = S.Pressed,
+                uncheckedThumbColor = S.Subdued,
+                uncheckedBorderColor = S.Pressed,
+            ),
+        )
     }
 }
 

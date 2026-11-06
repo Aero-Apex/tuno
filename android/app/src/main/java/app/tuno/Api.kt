@@ -148,6 +148,10 @@ class Prefs(ctx: Context) {
     var lastUpdateCheck: Long
         get() = sp.getLong("lastUpdateCheck", 0L)
         set(v) = sp.edit().putLong("lastUpdateCheck", v).apply()
+    /** When the queue ends (repeat off), keep playing more songs from the library, like Spotify's Autoplay. */
+    var autoplay: Boolean
+        get() = sp.getBoolean("autoplay", true)
+        set(v) = sp.edit().putBoolean("autoplay", v).apply()
     /** The version whose "what's new" screen was dismissed last. */
     var seenVersion: String
         get() = sp.getString("seenVersion", "")!!

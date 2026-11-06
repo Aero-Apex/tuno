@@ -41,6 +41,20 @@ data class ChangeEntry(val title: String, val sections: List<ChangeSection>)
 
 /** What changed in each Android release. Shown once after the app updates. Keep it in step with the release notes. */
 val ANDROID_CHANGELOG: Map<String, ChangeEntry> = mapOf(
+    "1.2.0" to ChangeEntry(
+        "Autoplay",
+        listOf(
+            ChangeSection(
+                "New",
+                listOf(
+                    ChangeItem(
+                        "Autoplay",
+                        "When your playlist or queue ends, Tuno keeps playing more songs from your library, starting with the artists you were listening to. Turn it off in Settings → Playback.",
+                    ),
+                ),
+            ),
+        ),
+    ),
     "1.1.6" to ChangeEntry(
         title = "What is new",
         sections = listOf(

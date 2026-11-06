@@ -26,6 +26,25 @@ data class PlayContext(val id: String, val kind: String, val name: String)
 
 data class QueueEntry(val index: Int, val title: String, val artist: String, val artwork: String?)
 
+/** A library song as a playable item. [autoplay] marks songs Autoplay added after the queue ran out. */
+fun trackItem(api: Api, t: Track, autoplay: Boolean = false): MediaItem = MediaItem.Builder()
+    .setMediaId("t${t.id}")
+    .setUri(api.streamUrl(t.id))
+    .setCustomCacheKey("track-${t.id}")
+    .setMediaMetadata(
+        MediaMetadata.Builder()
+            .setTitle(t.title)
+            .setArtist(t.artist)
+            .setAlbumTitle(t.album)
+            .setArtworkUri(api.imageUrl(t.cover)?.let(Uri::parse))
+            .setExtras(Bundle().apply {
+                putLong("trackId", t.id)
+                if (autoplay) putBoolean("autoplay", true)
+            })
+            .build(),
+    )
+    .build()
+
 /** What the screens need to know about playback, kept in sync with the background service through a MediaController. */
 class PlayerState(ctx: Context, private val api: Api) {
     private var controller: MediaController? = null
@@ -75,7 +94,10 @@ class PlayerState(ctx: Context, private val api: Api) {
 
         override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
             // Counts as a play (for "Recently played" / "On repeat") once a library song starts.
-            val id = item?.mediaMetadata?.extras?.getLong("trackId") ?: 0L
+            val extras = item?.mediaMetadata?.extras
+            // Autoplay songs aren't from the playlist that was playing.
+            if (extras?.getBoolean("autoplay") == true) context = null
+            val id = extras?.getLong("trackId") ?: 0L
             if (id > 0) {
                 onPlayed(id)
                 CoroutineScope(Dispatchers.IO).launch { api.markPlayed(id) }
@@ -129,20 +151,7 @@ class PlayerState(ctx: Context, private val api: Api) {
         }
     }
 
-    private fun item(t: Track): MediaItem = MediaItem.Builder()
-        .setMediaId("t${t.id}")
-        .setUri(api.streamUrl(t.id))
-        .setCustomCacheKey("track-${t.id}")
-        .setMediaMetadata(
-            MediaMetadata.Builder()
-                .setTitle(t.title)
-                .setArtist(t.artist)
-                .setAlbumTitle(t.album)
-                .setArtworkUri(api.imageUrl(t.cover)?.let(Uri::parse))
-                .setExtras(Bundle().apply { putLong("trackId", t.id) })
-                .build(),
-        )
-        .build()
+    private fun item(t: Track): MediaItem = trackItem(api, t)
 
     fun isContext(id: String) = context?.id == id
 
