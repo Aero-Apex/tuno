@@ -40,6 +40,8 @@ interface PlayerState {
   muted: boolean;
   shuffle: boolean;
   repeat: Repeat;
+  /** When the queue runs out (repeat off), keep going with more songs from the library, like Spotify's Autoplay. */
+  autoplay: boolean;
   /** Where the current queue came from, e.g. "playlist:3", so the UI can show what's playing. */
   context: string | null;
 
@@ -61,6 +63,7 @@ interface PlayerState {
   toggleMute: () => void;
   toggleShuffle: () => void;
   cycleRepeat: () => void;
+  setAutoplay: (on: boolean) => void;
   updateTrack: (t: Track) => void;
   /** Removes deleted library songs from the queue (stopping playback if the current one is gone). */
   dropTracks: (ids: number[]) => void;
@@ -78,6 +81,50 @@ function shuffled<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+/**
+ * Picks songs to play after the queue ends: library songs not already in the queue, favoring the artists
+ * that were just playing. Library songs are files on the server, so they play even when YouTube is blocking streams.
+ */
+async function autoplayItems(queue: QueueItem[]): Promise<QueueItem[]> {
+  const library = await api.tracks();
+  if (!library.length) return [];
+  const inQueue = new Set(queue.map((q) => q.track?.id).filter((id) => id != null));
+  const recentArtists = new Set(queue.slice(-20).map((q) => itemArtist(q).toLowerCase()).filter(Boolean));
+  let pool = library.filter((t) => !inQueue.has(t.id));
+  // Everything was in the queue already: start over with the whole library, minus the song that just ended.
+  if (!pool.length) pool = library.filter((t) => t.id !== queue[queue.length - 1]?.track?.id);
+  if (!pool.length) pool = library;
+  const same = shuffled(pool.filter((t) => recentArtists.has(t.artist.toLowerCase()))).slice(0, 10);
+  const picked = new Set(same.map((t) => t.id));
+  const rest = shuffled(pool.filter((t) => !picked.has(t.id))).slice(0, 25 - same.length);
+  return shuffled([...same, ...rest]).map(fromTrack);
+}
+
+let autoplayBusy = false;
+
+/** Called when the last song in the queue ends or fails. Returns false if playback should stop. */
+async function continueAfterQueue(): Promise<boolean> {
+  const { queue, autoplay } = usePlayer.getState();
+  if (!autoplay || autoplayBusy) return false;
+  autoplayBusy = true;
+  try {
+    const more = await autoplayItems(queue);
+    const s = usePlayer.getState();
+    // The user started something else while we were fetching.
+    if (s.queue !== queue || !more.length) return s.queue !== queue;
+    // Autoplay can run for hours: keep only the last 100 played songs so the queue (and what's saved of it) stays small.
+    const kept = queue.length > 400 ? queue.slice(-100) : queue;
+    const unshuffled = kept === queue && s.unshuffled ? [...s.unshuffled, ...more] : null;
+    usePlayer.setState({ queue: [...kept, ...more], unshuffled, index: kept.length, context: null });
+    load(more[0], true);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    autoplayBusy = false;
+  }
 }
 
 let loadedQid: string | null = null;
@@ -122,6 +169,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   muted: false,
   shuffle: saved?.shuffle ?? false,
   repeat: saved?.repeat ?? 'off',
+  autoplay: saved?.autoplay ?? true,
   context: saved?.context ?? null,
 
   playItems: (items, start = 0, context = null) => {
@@ -197,8 +245,10 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     if (ni >= queue.length) {
       if (repeat === 'off' && auto) {
         set({ playing: false });
-        audio.currentTime = 0;
         audio.pause();
+        void continueAfterQueue().then((ok) => {
+          if (!ok && usePlayer.getState().queue === queue) audio.currentTime = 0;
+        });
         return;
       }
       ni = 0;
@@ -243,6 +293,7 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     }
   },
   cycleRepeat: () => set({ repeat: get().repeat === 'off' ? 'all' : get().repeat === 'all' ? 'one' : 'off' }),
+  setAutoplay: (on) => set({ autoplay: on }),
   updateTrack: (t) =>
     set({ queue: get().queue.map((q) => (q.track?.id === t.id ? { ...q, track: t } : q)) }),
   reset: () => {
@@ -302,16 +353,19 @@ let errorStreak = 0;
 audio.addEventListener('error', () => {
   if (!audio.getAttribute('src')) return;
   usePlayer.setState({ loading: false, playing: false, error: 'Could not play this track' });
-  const { queue, index } = usePlayer.getState();
+  const { queue, index, repeat } = usePlayer.getState();
   // Skip past songs that can't play (YouTube bot checks, removed uploads) and keep going through the queue.
-  if (++errorStreak <= 10 && index < queue.length - 1) {
-    const failed = queue[index]?.qid;
-    setTimeout(() => {
-      // Only skip if the user hasn't picked something else meanwhile.
-      const s = usePlayer.getState();
-      if (s.queue[s.index]?.qid === failed) s.next();
-    }, 1500);
-  }
+  if (++errorStreak > 10) return;
+  const failed = queue[index]?.qid;
+  const last = index >= queue.length - 1;
+  if (last && repeat !== 'all' && !usePlayer.getState().autoplay) return;
+  setTimeout(() => {
+    // Only skip if the user hasn't picked something else meanwhile.
+    const s = usePlayer.getState();
+    if (s.queue[s.index]?.qid !== failed) return;
+    if (last && repeat !== 'all') void continueAfterQueue();
+    else s.next();
+  }, 1500);
 });
 audio.addEventListener('playing', () => (errorStreak = 0));
 
@@ -333,6 +387,7 @@ usePlayer.subscribe(() => {
           volume: s.volume,
           shuffle: s.shuffle,
           repeat: s.repeat,
+          autoplay: s.autoplay,
           context: s.context,
         }),
       );
@@ -346,7 +401,7 @@ window.addEventListener('pagehide', () => {
   try {
     localStorage.setItem(
       'tuno-player',
-      JSON.stringify({ queue: s.queue.slice(0, 1000), index: s.index, time: s.time, volume: s.volume, shuffle: s.shuffle, repeat: s.repeat, context: s.context }),
+      JSON.stringify({ queue: s.queue.slice(0, 1000), index: s.index, time: s.time, volume: s.volume, shuffle: s.shuffle, repeat: s.repeat, autoplay: s.autoplay, context: s.context }),
     );
   } catch {
     /* ignore */

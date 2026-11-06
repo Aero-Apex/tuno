@@ -14,11 +14,13 @@ import { api, type DownloadSettings } from '../lib/api';
 import { fmtBytes, fmtLong } from '../lib/format';
 import { useTheme } from '../store/theme';
 import { useUI } from '../store/ui';
+import { usePlayer } from '../store/player';
 import { DEFAULT_THEME, FONTS, PRESETS, loadFont, type Theme, type ThemeColors } from '../theme/theme';
 
 const TABS = [
   { id: 'account', label: 'Account', admin: false },
   { id: 'appearance', label: 'Appearance', admin: false },
+  { id: 'playback', label: 'Playback', admin: false },
   { id: 'storage', label: 'Storage', admin: false },
   { id: 'updates', label: 'Updates', admin: false },
   { id: 'thispc', label: 'This PC', admin: false },
@@ -49,6 +51,7 @@ export function SettingsPage() {
       <div className="max-w-4xl">
         {tab === 'account' && <Account />}
         {tab === 'appearance' && <Appearance />}
+        {tab === 'playback' && <Playback />}
         {tab === 'storage' && <Storage />}
         {tab === 'updates' && <AppUpdates />}
         {tab === 'thispc' && <ThisPc />}
@@ -144,6 +147,21 @@ const COLOR_LABELS: Record<keyof ThemeColors, string> = {
   text: 'Text',
   muted: 'Secondary text',
 };
+
+function Playback() {
+  const autoplay = usePlayer((s) => s.autoplay);
+  const setAutoplay = usePlayer((s) => s.setAutoplay);
+  return (
+    <Section title="Playback" description="Saved on this device.">
+      <Row
+        label="Autoplay"
+        hint="When your playlist or queue ends, keep playing more songs from your library, starting with the artists you were listening to. Repeat overrides it."
+      >
+        <Toggle value={autoplay} onChange={setAutoplay} label="Autoplay" />
+      </Row>
+    </Section>
+  );
+}
 
 function Appearance() {
   const { theme, set, replace } = useTheme();
