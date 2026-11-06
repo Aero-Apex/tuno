@@ -28,8 +28,8 @@ Get the latest build from the [Releases](../../releases) page:
 - **`Tuno-<version>.exe`**: the Windows app, for connecting to a Tuno server.
 - **`Tuno-<version>-on-this-PC.zip`**: the Windows app with its own engine. Unzip it and run `Tuno.exe`. No server needed;
   songs download to this PC and stay private. It's large because ffmpeg is included.
-- **`Tuno-<version>.dmg`**: the Mac app (macOS 11 or newer, Apple Silicon and Intel), for connecting to a Tuno server.
-  It isn't signed with an Apple Developer ID, so macOS asks once before opening it; see [`mac/README.md`](mac/README.md).
+- **`Tuno-<version>-mac.zip`**: the Mac app (macOS 11 or newer, Apple Silicon and Intel), for connecting to a Tuno
+  server. It isn't signed with an Apple Developer ID, so macOS asks once before opening it; see [`mac/README.md`](mac/README.md).
 
 To run the server yourself, see [Deploy / update](#deploy--update) below.
 
@@ -122,9 +122,9 @@ off under Settings → This PC. Discord must be open on the same PC.
 
 [`mac/`](mac) builds `Tuno.app`, a small native window (AppKit and WebKit, no Electron) around your server, like the
 Windows app: its own Dock icon and menu bar, music that keeps playing when the window is closed, a remembered window,
-a "can't reach your server" page that reconnects by itself, and your Discord listening status. A Mac is needed to
-compile it, so GitHub Actions builds it (Actions → **macOS app**, or automatically for each version tag). See
-[`mac/README.md`](mac/README.md).
+a "can't reach your server" page that reconnects by itself, and your Discord listening status. It's written in Go with
+no C compiler involved, so it builds on any computer, Windows included: run `mac/build.ps1` (or `bash mac/build.sh`).
+See [`mac/README.md`](mac/README.md).
 
 ## Automatic updates (Android and Windows)
 

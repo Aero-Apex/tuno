@@ -1,6 +1,6 @@
-# Builds the macOS app on GitHub's Macs (a Mac is needed to compile it).
-# Run it by hand from the Actions tab ("Run workflow"): the .dmg and .zip are attached to the run.
-# Pushing a version tag (v1.2.0) also builds it and adds the files to that tag's GitHub release.
+# Builds the macOS app. It's Go with no C compiler involved, so an ordinary Linux runner can build it.
+# Run it by hand from the Actions tab ("Run workflow"): the zip is attached to the run.
+# Pushing a version tag (v1.2.0) also builds it and adds the zip to that tag's GitHub release.
 name: macOS app
 
 on:
@@ -13,9 +13,13 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: mac/go.mod
 
       - name: Build Tuno.app
         run: bash mac/build.sh
@@ -23,9 +27,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Tuno-mac
-          path: |
-            mac/dist/Tuno-*.dmg
-            mac/dist/Tuno-*-mac.zip
+          path: mac/dist/Tuno-*-mac.zip
 
       - name: Add to the release
         if: startsWith(github.ref, 'refs/tags/')
@@ -37,4 +39,4 @@ jobs:
             gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 && break
             sleep 10
           done
-          gh release upload "$GITHUB_REF_NAME" mac/dist/Tuno-*.dmg mac/dist/Tuno-*-mac.zip --clobber
+          gh release upload "$GITHUB_REF_NAME" mac/dist/Tuno-*-mac.zip --clobber
