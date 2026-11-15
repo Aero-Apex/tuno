@@ -45,13 +45,13 @@ export function useActions() {
       return actions.importUrl(r.url);
     },
 
-    async addToPlaylist(playlistId: number, tracks: Track[], name?: string) {
+    async addToPlaylist(playlistId: number, tracks: Pick<Track, 'id'>[], name?: string) {
       await api.addToPlaylist(playlistId, tracks.map((t) => t.id));
       refresh('playlists', 'playlist');
       toast(`Added to ${name ?? 'playlist'}`, 'success');
     },
 
-    async newPlaylistWith(tracks: Track[]) {
+    async newPlaylistWith(tracks: Pick<Track, 'id' | 'title'>[]) {
       const p = await api.createPlaylist(tracks.length === 1 ? tracks[0].title : 'New playlist', tracks.map((t) => t.id));
       refresh('playlists');
       navigate(`/playlist/${p.id}`);

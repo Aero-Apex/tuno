@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, Ban, CheckCircle2, Clock, Download, Link2, Loader2, RotateCcw, Search, Trash2, X } from 'lucide-react';
+import { AlertCircle, Ban, CheckCircle2, Clock, Download, Link2, ListPlus, Loader2, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Cover } from '../components/Cover';
+import { Menu, useMenu } from '../components/Menu';
 import { Empty, Page } from '../components/Page';
 import { api, type Job } from '../lib/api';
 import { useActions } from '../lib/actions';
@@ -100,6 +101,9 @@ export function DownloadsPage() {
 
 function JobRow({ job: j, onAction, onDelete }: { job: Job; onAction: (fn: () => Promise<unknown>) => void; onDelete: () => void }) {
   const source = j.source ?? 'web';
+  const actions = useActions();
+  const menu = useMenu();
+  const { data: playlists = [] } = useQuery({ queryKey: ['playlists'], queryFn: api.playlists });
   return (
     <div className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-text/5">
       <Cover src={j.thumbnail} className="h-12 w-12 shrink-0" />
@@ -158,6 +162,24 @@ function JobRow({ job: j, onAction, onDelete }: { job: Job; onAction: (fn: () =>
           <button onClick={() => onAction(() => api.retryJob(j.id))} className="icon-btn" title="Retry" aria-label="Retry">
             <RotateCcw className="h-4 w-4" />
           </button>
+        )}
+        {j.status === 'done' && !!j.trackId && (
+          <button onClick={menu.open} className="icon-btn" title="Add to playlist" aria-label={`Add ${j.title ?? 'song'} to a playlist`}>
+            <ListPlus className="h-4 w-4" />
+          </button>
+        )}
+        {menu.isOpen && !!j.trackId && (
+          <Menu
+            {...menu.props([
+              {
+                label: 'New playlist',
+                icon: <Plus className="h-4 w-4" />,
+                onClick: () => actions.newPlaylistWith([{ id: j.trackId!, title: j.title ?? j.query ?? 'New playlist' }]),
+              },
+              ...(playlists.length ? [{ label: '', divider: true }] : []),
+              ...playlists.map((p) => ({ label: p.name, onClick: () => actions.addToPlaylist(p.id, [{ id: j.trackId! }], p.name) })),
+            ])}
+          />
         )}
         {j.status === 'done' && !!j.trackId && (
           <button onClick={onDelete} className="icon-btn hover:text-red-400" title="Delete song from library" aria-label={`Delete ${j.title ?? 'song'} from library`}>

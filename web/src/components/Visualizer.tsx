@@ -3,6 +3,7 @@ import { audio } from '../store/player';
 
 let analyser: AnalyserNode | null = null;
 let ctx: AudioContext | null = null;
+const readyListeners = new Set<(a: AnalyserNode) => void>();
 
 /**
  * Phones suspend Web Audio when the screen locks, and once <audio> is routed through it the music
@@ -10,41 +11,75 @@ let ctx: AudioContext | null = null;
  */
 const isTouchDevice = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 
-/** Routes the shared <audio> element through an analyser once (it can only be connected one time). */
-function getAnalyser(): AnalyserNode | null {
-  if (isTouchDevice) return null;
-  if (analyser) {
-    if (ctx?.state === 'suspended') ctx.resume().catch(() => {});
-    return analyser;
-  }
+/** Routes the shared <audio> element through an analyser. It can only be connected once, and from then on
+ *  the sound only comes out while the context is running, so this is called only once it is. */
+function connect(): AnalyserNode | null {
+  if (analyser) return analyser;
+  if (!ctx || ctx.state !== 'running') return null;
   try {
-    ctx = new AudioContext();
     const src = ctx.createMediaElementSource(audio);
-    analyser = ctx.createAnalyser();
-    analyser.fftSize = 64;
-    analyser.smoothingTimeConstant = 0.75;
-    src.connect(analyser);
-    analyser.connect(ctx.destination);
-    return analyser;
+    const node = ctx.createAnalyser();
+    node.fftSize = 64;
+    node.smoothingTimeConstant = 0.75;
+    src.connect(node);
+    node.connect(ctx.destination);
+    analyser = node;
+    readyListeners.forEach((fn) => fn(node));
+    readyListeners.clear();
+    return node;
   } catch {
     return null;
   }
 }
 
-// Keep the audio graph running whenever playback starts.
+/**
+ * Returns the analyser if it is already set up. Otherwise it starts the audio context and returns null:
+ * WebKit (Safari, the Mac app) keeps a context created without a click suspended, and routing the music
+ * through a suspended context would make it play silently. The music plays directly until the context runs.
+ */
+function getAnalyser(): AnalyserNode | null {
+  if (isTouchDevice) return null;
+  if (analyser) {
+    if (ctx?.state !== 'running') ctx?.resume().catch(() => {});
+    return analyser;
+  }
+  try {
+    if (!ctx) {
+      ctx = new AudioContext();
+      ctx.addEventListener('statechange', () => {
+        if (ctx?.state === 'running') connect();
+        else if (analyser && !audio.paused) ctx?.resume().catch(() => {});
+      });
+    }
+    if (ctx.state === 'running') return connect();
+    ctx.resume().catch(() => {});
+  } catch {
+    // no Web Audio: music still plays, only the bars are missing
+  }
+  return null;
+}
+
+// Keep the audio graph running whenever playback starts (this is also the moment a click has just allowed it).
 audio.addEventListener('play', () => {
-  if (ctx?.state === 'suspended') ctx.resume().catch(() => {});
+  if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+  else connect();
 });
 
 export function Visualizer({ className = '', bars = 12 }: { className?: string; bars?: number }) {
   const canvas = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    const a = getAnalyser();
     const c = canvas.current;
-    if (!a || !c) return;
+    if (!c) return;
+    let a = getAnalyser();
+    // The analyser may only become available later, once the audio context is allowed to run.
+    const onReady = (node: AnalyserNode) => {
+      a = node;
+      start();
+    };
+    if (!a) readyListeners.add(onReady);
     const g = c.getContext('2d')!;
-    const data = new Uint8Array(a.frequencyBinCount);
+    const data = new Uint8Array(32); // fftSize 64 gives 32 frequency bins
     let raf = 0;
     let last = 0;
     let onScreen = true;
@@ -52,7 +87,7 @@ export function Visualizer({ className = '', bars = 12 }: { className?: string; 
     let color = '';
     const readColor = () => (color = getComputedStyle(document.documentElement).getPropertyValue('--c-accent').trim().split(' ').join(','));
     // Animate only while the bar is on screen, the tab is visible and music is playing; otherwise the loop stops.
-    const wanted = () => onScreen && !audio.paused && !document.hidden;
+    const wanted = () => !!a && onScreen && !audio.paused && !document.hidden;
     const draw = (now = 0) => {
       if (!wanted()) {
         raf = 0;
@@ -60,7 +95,7 @@ export function Visualizer({ className = '', bars = 12 }: { className?: string; 
         return;
       }
       raf = requestAnimationFrame(draw);
-      if (now - last < 33) return; // ~30 fps is plenty for a few bars
+      if (!a || now - last < 33) return; // ~30 fps is plenty for a few bars
       last = now;
       const dpr = window.devicePixelRatio || 1;
       const w = c.clientWidth * dpr;
@@ -97,6 +132,7 @@ export function Visualizer({ className = '', bars = 12 }: { className?: string; 
     document.addEventListener('visibilitychange', start);
     start();
     return () => {
+      readyListeners.delete(onReady);
       watch.disconnect();
       audio.removeEventListener('play', start);
       document.removeEventListener('visibilitychange', start);
